@@ -75,7 +75,7 @@ class Snake{
   constructor(x,y,color,isBot=false){
     this.segments=[{x,y}];
     this.len=120;
-    this.speed=2.4;
+    this.speed=4;
     this.boost=false;
     this.angle=0;
     this.color=color;
@@ -147,7 +147,7 @@ function loop(){
   for(const b of bots){
     if(b.dead) continue;
     let tgt=player.segments[0];
-    if(dist(b.segments[0],tgt)>800) tgt=foods[Math.floor(Math.random()*foods.length)];
+    if(dist(b.segments[0],tgt)>8000) tgt=foods[Math.floor(Math.random()*foods.length)];
     b.update(tgt);
   }
 
@@ -165,7 +165,7 @@ function loop(){
         explode(player.segments[0].x,player.segments[0].y,'lime');
         dropFoodFromSnake(player);
         player.dead=true;
-        respawnTimer=120;
+        respawnTimer=0;
       }
     }
   }
