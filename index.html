@@ -29,7 +29,7 @@ const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 canvas.width = innerWidth; canvas.height = innerHeight; mini.width = mini.height = 180;
 
-const WORLD_SIZE = 10000; 
+const WORLD_SIZE = 1000; 
 let zoom = 1.2;
 let keys = { w:false, a:false, s:false, d:false };
 
@@ -57,7 +57,7 @@ class Snake{
 const player=new Snake(0,0,'lime');
 let respawnTimer=0;
 const bots=[];
-const MAX_BOTS=15;
+const MAX_BOTS=150;
 for(let i=0;i<MAX_BOTS;i++) bots.push(new Snake(rand(-1000,1000),rand(-1000,1000),'red',true));
 
 let score=0; let leaderboard=[];
@@ -88,7 +88,7 @@ function loop(){
 
   for(const b of bots){if(b.dead) continue; let tgt=player.segments[0]; if(dist(b.segments[0],tgt)>800) tgt=foods[Math.floor(Math.random()*foods.length)]; b.update(tgt);}
 
-  for(const b of bots){if(b.dead) continue; for(let i=20;i<player.segments.length;i++){if(dist(b.segments[0],player.segments[i])<6){b.dead=true; explode(b.segments[0].x,b.segments[0].y,'red'); dropFoodFromSnake(b); setTimeout(()=>{b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=120; b.dead=false;},1000);}} for(let i=10;i<b.segments.length;i++){if(!player.dead && dist(player.segments[0],b.segments[i])<6){explode(player.segments[0].x,player.segments[0].y,'lime'); dropFoodFromSnake(player); player.dead=true; respawnTimer=120;}}}
+  for(const b of bots){if(b.dead) continue; for(let i=20;i<player.segments.length;i++){if(dist(b.segments[0],player.segments[i])<6){b.dead=true; explode(b.segments[0].x,b.segments[0].y,'red'); dropFoodFromSnake(b); setTimeout(()=>{b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=120; b.dead=false;},1000);}} for(let i=1;i<b.segments.length;i++){if(!player.dead && dist(player.segments[0],b.segments[i])<6){explode(player.segments[0].x,player.segments[0].y,'lime'); dropFoodFromSnake(player); player.dead=true; respawnTimer=120;}}}
 
   for(let i=particles.length-1;i>=0;i--){const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.life--; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,2,2); if(p.life<=0) particles.splice(i,1);}
 
