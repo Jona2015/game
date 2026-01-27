@@ -26,8 +26,8 @@ canvas.height = innerHeight;
 mini.width = mini.height = 180;
 
 /* ================== WORLD ================== */
-const WORLD_SIZE = 1000;
-let zoom = 1.2;
+const WORLD_SIZE = 3000;
+let zoom = 1;
 
 /* ================== INPUT ================== */
 let keys = { w:false, a:false, s:false, d:false };
@@ -55,7 +55,7 @@ let camera = { x: 0, y: 0 };
 
 /* ================== FOOD ================== */
 const foods = [];
-for(let i=0;i<600;i++) foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
+for(let i=0;i<6000;i++) foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
 
 /* ================== PARTICLES ================== */
 const particles=[];
