@@ -49,8 +49,8 @@ function explode(x,y,color){for(let i=0;i<80;i++) particles.push({x,y,vx:rand(-3
 function dropFoodFromSnake(snake){for(const s of snake.segments) foods.push({x:s.x+rand(-5,5),y:s.y+rand(-5,5)});}
 
 class Snake{
-  constructor(x,y,color,isBot=false){this.segments=[{x,y}]; this.len=12; this.speed=2.4; this.boost=false; this.angle=0; this.color=color; this.isBot=isBot; this.dead=false;}
-  update(target){if(this.dead) return; if(this.boost && this.len>30) this.len-=0.25; if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x); const head=this.segments[0]; const sp=this.boost?this.speed*2.2:this.speed; const nh={x:head.x+Math.cos(this.angle)*sp,y:head.y+Math.sin(this.angle)*sp}; this.segments.unshift(nh); while(this.segments.length>this.len) this.segments.pop();}
+  constructor(x,y,color,isBot=false){this.segments=[{x,y}]; this.len=12; this.speed=5; this.boost=false; this.angle=0; this.color=color; this.isBot=isBot; this.dead=false;}
+  update(target){if(this.dead) return; if(this.boost && this.len>3) this.len-=0.25; if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x); const head=this.segments[0]; const sp=this.boost?this.speed*2.2:this.speed; const nh={x:head.x+Math.cos(this.angle)*sp,y:head.y+Math.sin(this.angle)*sp}; this.segments.unshift(nh); while(this.segments.length>this.len) this.segments.pop();}
   draw(){ctx.fillStyle=this.color; for(const s of this.segments){ctx.beginPath(); ctx.arc(s.x,s.y,6,0,Math.PI*2); ctx.fill();}}
 }
 
@@ -62,7 +62,7 @@ for(let i=0;i<MAX_BOTS;i++) bots.push(new Snake(rand(-1000,1000),rand(-1000,1000
 
 let score=0; let leaderboard=[];
 function updateScore(){score=Math.floor(player.len); updateLeaderboard();}
-function updateLeaderboard(){leaderboard.push({name:'You',score:score}); leaderboard.sort((a,b)=>b.score-a.score); if(leaderboard.length>10) leaderboard.pop();}
+function updateLeaderboard(){leaderboard.push({name:'You',score:score}); leaderboard.sort((a,b)=>b.score-a.score); if(leaderboard.length>1) leaderboard.pop();}
 function drawLeaderboard(){ctx.fillStyle='white'; ctx.font='18px Arial'; ctx.fillText('Leaderboard:',canvas.width-160,20); for(let i=0;i<leaderboard.length;i++){ctx.fillText(`${i+1}. ${leaderboard[i].name}: ${leaderboard[i].score}`,canvas.width-160,40+i*20);}}
 
 function spawnFood(amount){for(let i=0;i<amount;i++) foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});}
