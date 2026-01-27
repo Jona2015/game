@@ -57,7 +57,7 @@ class Snake{
 const player=new Snake(0,0,'lime');
 let respawnTimer=0;
 const bots=[];
-const MAX_BOTS=15;
+const MAX_BOTS=30;
 for(let i=0;i<MAX_BOTS;i++) bots.push(new Snake(rand(-1000,1000),rand(-1000,1000),'red',true));
 
 let score=0; let leaderboard=[];
