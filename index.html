@@ -29,7 +29,7 @@ const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 canvas.width = innerWidth; canvas.height = innerHeight; mini.width = mini.height = 180;
 
-const WORLD_SIZE = 5000; 
+const WORLD_SIZE = 3000; 
 let zoom = 0.3;
 let keys = { w:false, a:false, s:false, d:false };
 
@@ -41,7 +41,7 @@ const dist=(a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
 let camera={x:0,y:0};
 
 const foods=[];
-const MAX_FOOD=9000000;
+const MAX_FOOD=90000;
 for(let i=0;i<MAX_FOOD;i++) foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
 
 const particles=[];
