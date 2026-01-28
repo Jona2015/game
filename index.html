@@ -2,11 +2,10 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Minimap & Radar</title>
+<title>2D Slither.io – Bots & Minimap</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
-
 #minimap {
   position:fixed;
   top:10px;
@@ -40,36 +39,32 @@ let zoom = 0.3;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 1.2;
 const ZOOM_INTENSITY = 0.0015;
-
 let camera = { x: 0, y: 0 };
 
+// Zoom zur Mausposition
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
+  const mx = e.clientX;
+  const my = e.clientY;
+  const wx = (mx - canvas.width/2)/zoom + camera.x;
+  const wy = (my - canvas.height/2)/zoom + camera.y;
 
-  const mx=e.clientX, my=e.clientY;
-  const wx=(mx-canvas.width/2)/zoom+camera.x;
-  const wy=(my-canvas.height/2)/zoom+camera.y;
-
-  const nz=Math.max(
-    MIN_ZOOM,
-    Math.min(MAX_ZOOM, zoom*(1-e.deltaY*ZOOM_INTENSITY))
-  );
-
-  camera.x += (wx-camera.x)*(1-zoom/nz);
-  camera.y += (wy-camera.y)*(1-zoom/nz);
-  zoom=nz;
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom*(1 - e.deltaY*ZOOM_INTENSITY)));
+  camera.x += (wx - camera.x)*(1 - zoom/newZoom);
+  camera.y += (wy - camera.y)*(1 - zoom/newZoom);
+  zoom = newZoom;
 },{passive:false});
 
 // ===== INPUT =====
 let keys={w:0,a:0,s:0,d:0};
-window.addEventListener('keydown',e=>{
+window.addEventListener('keydown', e=>{
   if(e.code==='KeyW') keys.w=1;
   if(e.code==='KeyA') keys.a=1;
   if(e.code==='KeyS') keys.s=1;
   if(e.code==='KeyD') keys.d=1;
   if(e.code==='Space') player.boost=true;
 });
-window.addEventListener('keyup',e=>{
+window.addEventListener('keyup', e=>{
   if(e.code==='KeyW') keys.w=0;
   if(e.code==='KeyA') keys.a=0;
   if(e.code==='KeyS') keys.s=0;
@@ -97,10 +92,11 @@ class Snake{
     this.color=c;
     this.isBot=isBot;
     this.boostTick=0;
+    this.dead=false;
   }
   update(target){
+    if(this.dead) return;
     let sp=this.speed;
-
     if(this.boost && this.len>10){
       sp*=2.3;
       this.len-=0.15;
@@ -110,23 +106,18 @@ class Snake{
         foods.push({x:t.x,y:t.y});
       }
     }
-
     if(target)
-      this.angle=Math.atan2(
-        target.y-this.segments[0].y,
-        target.x-this.segments[0].x
-      );
+      this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
 
     const h=this.segments[0];
     this.segments.unshift({
       x:h.x+Math.cos(this.angle)*sp,
       y:h.y+Math.sin(this.angle)*sp
     });
-
     while(this.segments.length>this.len)
       this.segments.pop();
   }
-  draw(){
+  draw(ctx){
     ctx.fillStyle=this.color;
     for(const s of this.segments){
       ctx.beginPath();
@@ -145,22 +136,10 @@ for(let i=0;i<25;i++)
 // ===== MINIMAP =====
 function drawMiniMap(){
   mctx.clearRect(0,0,mini.width,mini.height);
-  const scale=mini.width/(WORLD_SIZE*2);
-
-  const drawDot=(x,y,c)=>{
-    mctx.fillStyle=c;
-    mctx.fillRect(
-      mini.width/2 + x*scale,
-      mini.height/2 + y*scale,
-      3,3
-    );
-  };
-
-  // Player
-  drawDot(player.segments[0].x,player.segments[0].y,'lime');
-
-  // Bots
-  bots.forEach(b=>drawDot(b.segments[0].x,b.segments[0].y,'red'));
+  const scale = mini.width / (WORLD_SIZE*2);
+  const dot=(x,y,c)=>{mctx.fillStyle=c;mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3);};
+  dot(player.segments[0].x,player.segments[0].y,'lime');
+  bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
 }
 
 // ===== LOOP =====
@@ -168,6 +147,7 @@ function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  // Kamera sanft folgen
   camera.x += (player.segments[0].x-camera.x)*0.08;
   camera.y += (player.segments[0].y-camera.y)*0.08;
 
@@ -175,14 +155,9 @@ function loop(){
   ctx.scale(zoom,zoom);
   ctx.translate(-camera.x,-camera.y);
 
-  // ===== RADAR =====
+  // Radar-Kreis
   ctx.beginPath();
-  ctx.arc(
-    player.segments[0].x,
-    player.segments[0].y,
-    600,
-    0,Math.PI*2
-  );
+  ctx.arc(player.segments[0].x,player.segments[0].y,600,0,Math.PI*2);
   ctx.strokeStyle='rgba(0,255,0,0.15)';
   ctx.lineWidth=8;
   ctx.stroke();
@@ -200,44 +175,57 @@ function loop(){
   }
 
   // PLAYER MOVE
-  let mx=keys.d-keys.a;
-  let my=keys.s-keys.w;
-  let target=mx||my?{
-    x:player.segments[0].x+mx*100,
-    y:player.segments[0].y+my*100
-  }:null;
-
+  let mx = keys.d-keys.a;
+  let my = keys.s-keys.w;
+  let target = mx||my ? {x:player.segments[0].x+mx*100, y:player.segments[0].y+my*100} : null;
   player.update(target);
 
   // BOT KI
   bots.forEach(b=>{
+    if(b.dead) return;
     let t;
-    const d=dist(b.segments[0],player.segments[0]);
+    const d = dist(b.segments[0],player.segments[0]);
     if(d<600){
-      if(b.len>player.len*1.1){
+      if(b.len>player.len*1.1){ b.boost=true; t=player.segments[0]; }
+      else{
         b.boost=true;
-        t=player.segments[0];
-      }else{
-        b.boost=true;
-        const a=Math.atan2(
-          b.segments[0].y-player.segments[0].y,
-          b.segments[0].x-player.segments[0].x
-        );
-        t={
-          x:b.segments[0].x+Math.cos(a)*300,
-          y:b.segments[0].y+Math.sin(a)*300
-        };
+        const a=Math.atan2(b.segments[0].y-player.segments[0].y,b.segments[0].x-player.segments[0].x);
+        t={x:b.segments[0].x+Math.cos(a)*300,y:b.segments[0].y+Math.sin(a)*300};
       }
-    }else{
-      b.boost=false;
-      t=foods[Math.floor(Math.random()*foods.length)];
-    }
+    }else{ b.boost=false; t=foods[Math.floor(Math.random()*foods.length)]; }
     b.update(t);
   });
 
-  player.draw();
-  bots.forEach(b=>b.draw());
+  // ===== KOLLISIONEN Spieler ↔ Bots =====
+  for(const b of bots){
+    if(b.dead) continue;
 
+    // Spieler-Kopf trifft Bot-Körper → Bot stirbt
+    for(let i=15;i<b.segments.length;i++){
+      if(dist(player.segments[0],b.segments[i])<6){
+        b.dead=true;
+        // drop food
+        for(const s of b.segments) foods.push({x:s.x,y:s.y});
+        // Respawn Bot
+        setTimeout(()=>{
+          b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
+          b.len=rand(20,120);
+          b.dead=false;
+        },1000);
+      }
+    }
+
+    // Bot-Kopf trifft Spieler-Körper → Spieler stirbt
+    for(let i=15;i<player.segments.length;i++){
+      if(dist(player.segments[0],b.segments[i])<6){
+        player.segments=[{x:0,y:0}];
+        player.len=20;
+      }
+    }
+  }
+
+  player.draw(ctx);
+  bots.forEach(b=>!b.dead && b.draw(ctx));
   drawMiniMap();
   requestAnimationFrame(loop);
 }
