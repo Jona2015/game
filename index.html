@@ -34,7 +34,7 @@ mini.width = mini.height = 180;
 
 const WORLD_SIZE = 3000;
 
-// ===== CAMERA & ZOOM =====
+// CAMERA & ZOOM
 let zoom = 0.3;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 1.2;
@@ -52,7 +52,7 @@ canvas.addEventListener('wheel', e=>{
   zoom = newZoom;
 },{passive:false});
 
-// ===== INPUT =====
+// INPUT
 let keys={w:0,a:0,s:0,d:0};
 window.addEventListener('keydown', e=>{
   if(e.code==='KeyW') keys.w=1;
@@ -69,16 +69,16 @@ window.addEventListener('keyup', e=>{
   if(e.code==='Space') player.boost=false;
 });
 
-// ===== UTILS =====
+// UTILS
 const rand=(a,b)=>Math.random()*(b-a)+a;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-// ===== FOOD =====
+// FOOD
 const foods=[];
 for(let i=0;i<12000;i++)
   foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
 
-// ===== SNAKE =====
+// SNAKE CLASS
 class Snake{
   constructor(x,y,c,isBot=false){
     this.segments=[{x,y}];
@@ -122,13 +122,13 @@ class Snake{
   }
 }
 
-// ===== PLAYER & BOTS =====
+// PLAYER & BOTS
 const player=new Snake(0,0,'lime');
 const bots=[];
 for(let i=0;i<25;i++)
   bots.push(new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
 
-// ===== MINIMAP =====
+// MINIMAP
 function drawMiniMap(){
   mctx.clearRect(0,0,mini.width,mini.height);
   const scale=mini.width/(WORLD_SIZE*2);
@@ -137,7 +137,7 @@ function drawMiniMap(){
   bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
 }
 
-// ===== LOOP =====
+// LOOP
 function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -149,7 +149,7 @@ function loop(){
   ctx.scale(zoom,zoom);
   ctx.translate(-camera.x,-camera.y);
 
-  // Radar-Kreis
+  // Radar
   ctx.beginPath();
   ctx.arc(player.segments[0].x,player.segments[0].y,600,0,Math.PI*2);
   ctx.strokeStyle='rgba(0,255,0,0.15)';
@@ -190,11 +190,11 @@ function loop(){
     b.update(t);
   });
 
-  // ===== UMGEDREHTE KOLLISIONEN =====
+  // COLLISIONS – UMGEDREHT
   bots.forEach(b=>{
     if(b.dead) return;
 
-    // ⚡ Bot-Kopf trifft Spieler-Körper → Bot stirbt
+    // Bot-Kopf trifft Spieler-Körper → Bot stirbt
     for(let i=15;i<player.segments.length;i++){
       if(dist(b.segments[0],player.segments[i])<6){
         b.dead=true;
@@ -207,7 +207,7 @@ function loop(){
       }
     }
 
-    // ⚡ Spieler-Kopf trifft Bot-Körper → Spieler stirbt
+    // Spieler-Kopf trifft Bot-Körper → Spieler stirbt
     for(let i=15;i<b.segments.length;i++){
       if(!player.dead && dist(player.segments[0],b.segments[i])<6){
         player.dead=true;
