@@ -2,38 +2,62 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Advanced AI</title>
+<title>2D Slither.io – Minimap & Radar</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
-#adminPanel {
-  position:fixed; left:10px; top:10px;
-  background:#222a; color:white;
-  padding:10px; border-radius:8px;
+
+#minimap {
+  position:fixed;
+  top:10px;
+  right:10px;
+  width:180px;
+  height:180px;
+  background:#000c;
+  border:2px solid #555;
 }
 </style>
 </head>
 <body>
 
-<div id="adminPanel">
-  <input type="password" id="adminPin" placeholder="PIN"><br>
-  <button onclick="admin.killAllBots()">Kill All Bots</button>
-</div>
-
 <canvas id="game"></canvas>
+<canvas id="minimap"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d');
+
 canvas.width = innerWidth;
 canvas.height = innerHeight;
+mini.width = mini.height = 180;
 
 const WORLD_SIZE = 3000;
 
-// ===== ZOOM =====
+// ===== CAMERA & ZOOM =====
 let zoom = 0.3;
-window.addEventListener('wheel', e=>{
-  zoom=Math.max(0.15,Math.min(1.2,zoom-e.deltaY*0.0015));
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 1.2;
+const ZOOM_INTENSITY = 0.0015;
+
+let camera = { x: 0, y: 0 };
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+
+  const mx=e.clientX, my=e.clientY;
+  const wx=(mx-canvas.width/2)/zoom+camera.x;
+  const wy=(my-canvas.height/2)/zoom+camera.y;
+
+  const nz=Math.max(
+    MIN_ZOOM,
+    Math.min(MAX_ZOOM, zoom*(1-e.deltaY*ZOOM_INTENSITY))
+  );
+
+  camera.x += (wx-camera.x)*(1-zoom/nz);
+  camera.y += (wy-camera.y)*(1-zoom/nz);
+  zoom=nz;
 },{passive:false});
 
 // ===== INPUT =====
@@ -59,15 +83,8 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 // ===== FOOD =====
 const foods=[];
-for(let i=0;i<15000;i++)
+for(let i=0;i<12000;i++)
   foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
-
-// ===== PARTICLES =====
-const particles=[];
-function explode(x,y,c){
-  for(let i=0;i<50;i++)
-    particles.push({x,y,vx:rand(-3,3),vy:rand(-3,3),life:40,c});
-}
 
 // ===== SNAKE =====
 class Snake{
@@ -78,27 +95,27 @@ class Snake{
     this.angle=0;
     this.boost=false;
     this.color=c;
-    this.dead=false;
     this.isBot=isBot;
     this.boostTick=0;
   }
   update(target){
-    if(this.dead) return;
-
-    // BOOST LOGIK
     let sp=this.speed;
+
     if(this.boost && this.len>10){
       sp*=2.3;
       this.len-=0.15;
       this.boostTick++;
       if(this.boostTick%5===0){
         const t=this.segments[this.segments.length-1];
-        foods.push({x:t.x+rand(-5,5),y:t.y+rand(-5,5)});
+        foods.push({x:t.x,y:t.y});
       }
     }
 
     if(target)
-      this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
+      this.angle=Math.atan2(
+        target.y-this.segments[0].y,
+        target.x-this.segments[0].x
+      );
 
     const h=this.segments[0];
     this.segments.unshift({
@@ -106,7 +123,8 @@ class Snake{
       y:h.y+Math.sin(this.angle)*sp
     });
 
-    while(this.segments.length>this.len) this.segments.pop();
+    while(this.segments.length>this.len)
+      this.segments.pop();
   }
   draw(){
     ctx.fillStyle=this.color;
@@ -118,42 +136,56 @@ class Snake{
   }
 }
 
-// ===== PLAYER =====
+// ===== PLAYER & BOTS =====
 const player=new Snake(0,0,'lime');
-
-// ===== BOTS =====
 const bots=[];
 for(let i=0;i<25;i++)
   bots.push(new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
 
-window.admin={
-  killAllBots(){
-    bots.forEach(b=>{
-      explode(b.segments[0].x,b.segments[0].y,'red');
-      b.dead=true;
-      setTimeout(()=>{
-        b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
-        b.len=rand(20,120);
-        b.dead=false;
-      },800);
-    });
-  }
-};
+// ===== MINIMAP =====
+function drawMiniMap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  const scale=mini.width/(WORLD_SIZE*2);
 
-// ===== CAMERA =====
-let camera={x:0,y:0};
+  const drawDot=(x,y,c)=>{
+    mctx.fillStyle=c;
+    mctx.fillRect(
+      mini.width/2 + x*scale,
+      mini.height/2 + y*scale,
+      3,3
+    );
+  };
+
+  // Player
+  drawDot(player.segments[0].x,player.segments[0].y,'lime');
+
+  // Bots
+  bots.forEach(b=>drawDot(b.segments[0].x,b.segments[0].y,'red'));
+}
 
 // ===== LOOP =====
 function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  camera.x=player.segments[0].x;
-  camera.y=player.segments[0].y;
+  camera.x += (player.segments[0].x-camera.x)*0.08;
+  camera.y += (player.segments[0].y-camera.y)*0.08;
 
   ctx.translate(canvas.width/2,canvas.height/2);
   ctx.scale(zoom,zoom);
   ctx.translate(-camera.x,-camera.y);
+
+  // ===== RADAR =====
+  ctx.beginPath();
+  ctx.arc(
+    player.segments[0].x,
+    player.segments[0].y,
+    600,
+    0,Math.PI*2
+  );
+  ctx.strokeStyle='rgba(0,255,0,0.15)';
+  ctx.lineWidth=8;
+  ctx.stroke();
 
   // FOOD
   ctx.fillStyle='orange';
@@ -170,23 +202,22 @@ function loop(){
   // PLAYER MOVE
   let mx=keys.d-keys.a;
   let my=keys.s-keys.w;
-  let target=mx||my?{x:player.segments[0].x+mx*100,y:player.segments[0].y+my*100}:null;
+  let target=mx||my?{
+    x:player.segments[0].x+mx*100,
+    y:player.segments[0].y+my*100
+  }:null;
+
   player.update(target);
 
-  // ===== BOT KI =====
+  // BOT KI
   bots.forEach(b=>{
-    if(b.dead) return;
     let t;
-
     const d=dist(b.segments[0],player.segments[0]);
-
-    if(d<700){
+    if(d<600){
       if(b.len>player.len*1.1){
-        // ANGREIFEN
-        t=player.segments[0];
         b.boost=true;
+        t=player.segments[0];
       }else{
-        // FLUCHT
         b.boost=true;
         const a=Math.atan2(
           b.segments[0].y-player.segments[0].y,
@@ -198,27 +229,16 @@ function loop(){
         };
       }
     }else{
-      // FOOD FARMEN
       b.boost=false;
       t=foods[Math.floor(Math.random()*foods.length)];
     }
-
     b.update(t);
   });
 
-  // DRAW
   player.draw();
   bots.forEach(b=>b.draw());
 
-  // PARTICLES
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i];
-    p.x+=p.vx; p.y+=p.vy; p.life--;
-    ctx.fillStyle=p.c;
-    ctx.fillRect(p.x,p.y,2,2);
-    if(p.life<=0) particles.splice(i,1);
-  }
-
+  drawMiniMap();
   requestAnimationFrame(loop);
 }
 
