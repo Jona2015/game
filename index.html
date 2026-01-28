@@ -29,8 +29,8 @@ const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 canvas.width = innerWidth; canvas.height = innerHeight; mini.width = mini.height = 180;
 
-const WORLD_SIZE = 2000; 
-let zoom = 1.2;
+const WORLD_SIZE = 5000; 
+let zoom = 0.5;
 let keys = { w:false, a:false, s:false, d:false };
 
 window.addEventListener('keydown', e => { if(e.code==='KeyW') keys.w=true; if(e.code==='KeyA') keys.a=true; if(e.code==='KeyS') keys.s=true; if(e.code==='KeyD') keys.d=true; if(e.code==='Space') player.boost=true; });
@@ -71,7 +71,7 @@ window.admin={spawnFood:spawnFood,killAllBots:killAllBots,leaderboard:()=>leader
 
 function spawnFoodAdmin(){
     const pin = document.getElementById('adminPin').value;
-    if(pin !== '958460'){ alert('Falscher Admin-Pin!'); return; }
+    if(pin !== '1234'){ alert('Falscher Admin-Pin!'); return; }
     const amount = parseInt(document.getElementById('foodAmount').value);
     if(amount>0) admin.spawnFood(amount);
 }
