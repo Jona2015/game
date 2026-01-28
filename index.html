@@ -2,122 +2,110 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Advanced</title>
+<title>2D Slither.io – Advanced AI</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
-#minimap {
-  position:fixed; right:10px; top:10px;
-  width:180px; height:180px;
-  background:#000a; border:2px solid #555;
-}
 #adminPanel {
   position:fixed; left:10px; top:10px;
   background:#222a; color:white;
   padding:10px; border-radius:8px;
-  font-family:Arial;
 }
-#adminPanel input { width:50px; }
-#adminPanel button { display:block; margin-top:5px; }
 </style>
 </head>
 <body>
 
 <div id="adminPanel">
   <input type="password" id="adminPin" placeholder="PIN"><br>
-  <input type="number" id="foodAmount" value="100"><br>
-  <button onclick="spawnFoodAdmin()">Spawn Food</button>
   <button onclick="admin.killAllBots()">Kill All Bots</button>
 </div>
 
 <canvas id="game"></canvas>
-<canvas id="minimap"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const mini = document.getElementById('minimap');
-const mctx = mini.getContext('2d');
-
 canvas.width = innerWidth;
 canvas.height = innerHeight;
-mini.width = mini.height = 180;
 
 const WORLD_SIZE = 3000;
 
 // ===== ZOOM =====
-let zoom = 1;
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 0.1;
-const ZOOM_SPEED = 0.01;
-
-window.addEventListener('wheel', e => {
-  e.preventDefault();
-  zoom -= e.deltaY * ZOOM_SPEED;
-  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+let zoom = 0.3;
+window.addEventListener('wheel', e=>{
+  zoom=Math.max(0.15,Math.min(1.2,zoom-e.deltaY*0.0015));
 },{passive:false});
 
-// =================
-
-let keys={w:false,a:false,s:false,d:false};
+// ===== INPUT =====
+let keys={w:0,a:0,s:0,d:0};
 window.addEventListener('keydown',e=>{
-  if(e.code==='KeyW') keys.w=true;
-  if(e.code==='KeyA') keys.a=true;
-  if(e.code==='KeyS') keys.s=true;
-  if(e.code==='KeyD') keys.d=true;
+  if(e.code==='KeyW') keys.w=1;
+  if(e.code==='KeyA') keys.a=1;
+  if(e.code==='KeyS') keys.s=1;
+  if(e.code==='KeyD') keys.d=1;
   if(e.code==='Space') player.boost=true;
 });
 window.addEventListener('keyup',e=>{
-  if(e.code==='KeyW') keys.w=false;
-  if(e.code==='KeyA') keys.a=false;
-  if(e.code==='KeyS') keys.s=false;
-  if(e.code==='KeyD') keys.d=false;
+  if(e.code==='KeyW') keys.w=0;
+  if(e.code==='KeyA') keys.a=0;
+  if(e.code==='KeyS') keys.s=0;
+  if(e.code==='KeyD') keys.d=0;
   if(e.code==='Space') player.boost=false;
 });
 
+// ===== UTILS =====
 const rand=(a,b)=>Math.random()*(b-a)+a;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
+// ===== FOOD =====
 const foods=[];
-const MAX_FOOD=20000;
-for(let i=0;i<MAX_FOOD;i++)
+for(let i=0;i<15000;i++)
   foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
 
+// ===== PARTICLES =====
 const particles=[];
-function explode(x,y,color){
-  for(let i=0;i<80;i++)
-    particles.push({x,y,vx:rand(-3,3),vy:rand(-3,3),life:60,color});
-}
-function dropFoodFromSnake(s){
-  for(const seg of s.segments)
-    foods.push({x:seg.x+rand(-5,5),y:seg.y+rand(-5,5)});
+function explode(x,y,c){
+  for(let i=0;i<50;i++)
+    particles.push({x,y,vx:rand(-3,3),vy:rand(-3,3),life:40,c});
 }
 
+// ===== SNAKE =====
 class Snake{
-  constructor(x,y,color,isBot=false){
+  constructor(x,y,c,isBot=false){
     this.segments=[{x,y}];
-    this.len=12;
-    this.speed=5;
+    this.len=20;
+    this.speed=4;
     this.angle=0;
     this.boost=false;
-    this.color=color;
+    this.color=c;
     this.dead=false;
     this.isBot=isBot;
+    this.boostTick=0;
   }
   update(target){
     if(this.dead) return;
-    if(this.boost && this.len>5) this.len-=0.25;
+
+    // BOOST LOGIK
+    let sp=this.speed;
+    if(this.boost && this.len>10){
+      sp*=2.3;
+      this.len-=0.15;
+      this.boostTick++;
+      if(this.boostTick%5===0){
+        const t=this.segments[this.segments.length-1];
+        foods.push({x:t.x+rand(-5,5),y:t.y+rand(-5,5)});
+      }
+    }
+
     if(target)
-      this.angle=Math.atan2(
-        target.y-this.segments[0].y,
-        target.x-this.segments[0].x
-      );
+      this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
+
     const h=this.segments[0];
-    const sp=this.boost?this.speed*2.2:this.speed;
     this.segments.unshift({
       x:h.x+Math.cos(this.angle)*sp,
       y:h.y+Math.sin(this.angle)*sp
     });
+
     while(this.segments.length>this.len) this.segments.pop();
   }
   draw(){
@@ -130,40 +118,32 @@ class Snake{
   }
 }
 
+// ===== PLAYER =====
 const player=new Snake(0,0,'lime');
-let respawnTimer=0;
 
+// ===== BOTS =====
 const bots=[];
-for(let i=0;i<30;i++)
-  bots.push(new Snake(rand(-1000,1000),rand(-1000,1000),'red',true));
+for(let i=0;i<25;i++)
+  bots.push(new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
 
 window.admin={
   killAllBots(){
     bots.forEach(b=>{
-      if(!b.dead){
-        explode(b.segments[0].x,b.segments[0].y,'red');
-        dropFoodFromSnake(b);
-        b.dead=true;
-        setTimeout(()=>{
-          b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
-          b.len=120;
-          b.dead=false;
-        },1000);
-      }
+      explode(b.segments[0].x,b.segments[0].y,'red');
+      b.dead=true;
+      setTimeout(()=>{
+        b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
+        b.len=rand(20,120);
+        b.dead=false;
+      },800);
     });
   }
 };
 
-function spawnFoodAdmin(){
-  if(document.getElementById('adminPin').value!=='1234'){
-    alert('Falscher PIN'); return;
-  }
-  for(let i=0;i<+foodAmount.value;i++)
-    foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
-}
-
+// ===== CAMERA =====
 let camera={x:0,y:0};
 
+// ===== LOOP =====
 function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -181,80 +161,63 @@ function loop(){
     ctx.beginPath();
     ctx.arc(f.x,f.y,4,0,Math.PI*2);
     ctx.fill();
-    if(!player.dead && dist(player.segments[0],f)<10){
+    if(dist(player.segments[0],f)<10){
       player.len+=2;
       foods.splice(foods.indexOf(f),1);
     }
   }
 
   // PLAYER MOVE
-  let mx=0,my=0;
-  if(keys.w) my--;
-  if(keys.s) my++;
-  if(keys.a) mx--;
-  if(keys.d) mx++;
-  let target = mx||my ? {
-    x:player.segments[0].x+mx*100,
-    y:player.segments[0].y+my*100
-  } : null;
+  let mx=keys.d-keys.a;
+  let my=keys.s-keys.w;
+  let target=mx||my?{x:player.segments[0].x+mx*100,y:player.segments[0].y+my*100}:null;
+  player.update(target);
 
-  if(!player.dead) player.update(target);
-  else if(respawnTimer--<=0){
-    player.segments=[{x:0,y:0}];
-    player.len=120;
-    player.dead=false;
-  }
-
-  // BOT UPDATE
+  // ===== BOT KI =====
   bots.forEach(b=>{
-    if(!b.dead){
-      let t = dist(b.segments[0],player.segments[0])<800
-        ? player.segments[0]
-        : foods[Math.floor(Math.random()*foods.length)];
-      b.update(t);
+    if(b.dead) return;
+    let t;
+
+    const d=dist(b.segments[0],player.segments[0]);
+
+    if(d<700){
+      if(b.len>player.len*1.1){
+        // ANGREIFEN
+        t=player.segments[0];
+        b.boost=true;
+      }else{
+        // FLUCHT
+        b.boost=true;
+        const a=Math.atan2(
+          b.segments[0].y-player.segments[0].y,
+          b.segments[0].x-player.segments[0].x
+        );
+        t={
+          x:b.segments[0].x+Math.cos(a)*300,
+          y:b.segments[0].y+Math.sin(a)*300
+        };
+      }
+    }else{
+      // FOOD FARMEN
+      b.boost=false;
+      t=foods[Math.floor(Math.random()*foods.length)];
     }
+
+    b.update(t);
   });
 
-  // ===== KOLLISIONEN =====
-  for(const b of bots){
-    if(b.dead) continue;
+  // DRAW
+  player.draw();
+  bots.forEach(b=>b.draw());
 
-    // Bot stirbt
-    for(let i=15;i<player.segments.length;i++){
-      if(!player.dead && dist(b.segments[0],player.segments[i])<6){
-        b.dead=true;
-        explode(b.segments[0].x,b.segments[0].y,'red');
-        dropFoodFromSnake(b);
-        setTimeout(()=>{
-          b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
-          b.len=120;
-          b.dead=false;
-        },1000);
-      }
-    }
-
-    // Spieler stirbt
-    for(let i=1;i<b.segments.length;i++){
-      if(!player.dead && dist(player.segments[0],b.segments[i])<6){
-        explode(player.segments[0].x,player.segments[0].y,'lime');
-        dropFoodFromSnake(player);
-        player.dead=true;
-        respawnTimer=120;
-      }
-    }
-  }
-
-  // PARTIKEL
+  // PARTICLES
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i];
     p.x+=p.vx; p.y+=p.vy; p.life--;
-    ctx.fillStyle=p.color;
+    ctx.fillStyle=p.c;
     ctx.fillRect(p.x,p.y,2,2);
     if(p.life<=0) particles.splice(i,1);
   }
-
-  if(!player.dead) player.draw();
-  bots.forEach(b=>!b.dead && b.draw());
 
   requestAnimationFrame(loop);
 }
