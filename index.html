@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Umgedrehte Kollisionen</title>
+<title>2D Slither.io – Bots greifen Spieler & Bots an</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
@@ -174,27 +174,41 @@ function loop(){
   let target = mx||my ? {x:player.segments[0].x+mx*100, y:player.segments[0].y+my*100} : null;
   if(!player.dead) player.update(target);
 
-  // BOT KI
+  // BOT KI: Angriff auf Spieler & andere Bots
   bots.forEach(b=>{
     if(b.dead) return;
     let t;
-    const d = dist(b.segments[0],player.segments[0]);
-    if(d<600){
-      if(b.len>player.len*1.1){ b.boost=true; t=player.segments[0]; }
-      else{
-        b.boost=true;
-        const a=Math.atan2(b.segments[0].y-player.segments[0].y,b.segments[0].x-player.segments[0].x);
-        t={x:b.segments[0].x+Math.cos(a)*300,y:b.segments[0].y+Math.sin(a)*300};
+    // Priorität: nächster schwächerer Gegner (Spieler oder Bot)
+    let closest=null;
+    let minD=Infinity;
+    // Spieler
+    if(!player.dead && b.len>player.len*0.9){
+      const d=dist(b.segments[0],player.segments[0]);
+      if(d<minD){ minD=d; closest=player; }
+    }
+    // Andere Bots
+    bots.forEach(o=>{
+      if(o===b || o.dead) return;
+      if(b.len>o.len*0.9){
+        const d=dist(b.segments[0],o.segments[0]);
+        if(d<minD){ minD=d; closest=o; }
       }
-    }else{ b.boost=false; t=foods[Math.floor(Math.random()*foods.length)]; }
+    });
+
+    if(closest){
+      t=closest.segments[0];
+      b.boost=true;
+    }else{
+      b.boost=false;
+      t=foods[Math.floor(Math.random()*foods.length)];
+    }
     b.update(t);
   });
 
-  // COLLISIONS – UMGEDREHT
+  // COLLISIONS – Bots & Spieler
+  // Bots treffen Spieler
   bots.forEach(b=>{
     if(b.dead) return;
-
-    // Bot-Kopf trifft Spieler-Körper → Bot stirbt
     for(let i=15;i<player.segments.length;i++){
       if(dist(b.segments[0],player.segments[i])<6){
         b.dead=true;
@@ -206,8 +220,11 @@ function loop(){
         },1000);
       }
     }
+  });
 
-    // Spieler-Kopf trifft Bot-Körper → Spieler stirbt
+  // Spieler trifft Bots
+  bots.forEach(b=>{
+    if(b.dead) return;
     for(let i=15;i<b.segments.length;i++){
       if(!player.dead && dist(player.segments[0],b.segments[i])<6){
         player.dead=true;
@@ -218,6 +235,25 @@ function loop(){
         },1000);
       }
     }
+  });
+
+  // Bots treffen Bots untereinander
+  bots.forEach(b=>{
+    if(b.dead) return;
+    bots.forEach(o=>{
+      if(o===b || o.dead) return;
+      for(let i=15;i<o.segments.length;i++){
+        if(dist(b.segments[0],o.segments[i])<6){
+          o.dead=true;
+          o.segments.forEach(s=>foods.push({x:s.x,y:s.y}));
+          setTimeout(()=>{
+            o.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
+            o.len=rand(20,120);
+            o.dead=false;
+          },1000);
+        }
+      }
+    });
   });
 
   player.draw(ctx);
