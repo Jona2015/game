@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Bots greifen Spieler & Bots an</title>
+<title>2D Slither.io – Bots greifen Spieler & Bots</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
@@ -149,12 +149,7 @@ function loop(){
   ctx.scale(zoom,zoom);
   ctx.translate(-camera.x,-camera.y);
 
-  // Radar
-  ctx.beginPath();
-  ctx.arc(player.segments[0].x,player.segments[0].y,600,0,Math.PI*2);
-  ctx.strokeStyle='rgba(0,255,0,0.15)';
-  ctx.lineWidth=8;
-  ctx.stroke();
+  // ===== Radar deaktiviert =====
 
   // FOOD
   ctx.fillStyle='orange';
@@ -178,7 +173,6 @@ function loop(){
   bots.forEach(b=>{
     if(b.dead) return;
     let t;
-    // Priorität: nächster schwächerer Gegner (Spieler oder Bot)
     let closest=null;
     let minD=Infinity;
     // Spieler
@@ -205,7 +199,7 @@ function loop(){
     b.update(t);
   });
 
-  // COLLISIONS – Bots & Spieler
+  // COLLISIONS
   // Bots treffen Spieler
   bots.forEach(b=>{
     if(b.dead) return;
