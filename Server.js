@@ -1,32 +1,71 @@
-const WebSocket = require("ws");
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Multiplayer Test</title>
+<style>
+body { margin:0; background:#111; overflow:hidden }
+canvas { display:block }
+</style>
+</head>
+<body>
 
-const wss = new WebSocket.Server({ port: 3000 });
-const players = {};
+<canvas id="c"></canvas>
 
-wss.on("connection", ws => {
-  const id = Math.random().toString(36).slice(2);
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-  players[id] = {
-    x: 0,
-    y: 0,
-    angle: 0,
-    len: 20
-  };
+// 🔴 WICHTIG: IP anpassen (dein PC)
+const socket = new WebSocket("ws://localhost:3000");
 
-  ws.send(JSON.stringify({ id }));
+let myId = null;
+let players = {};
 
-  ws.on("message", msg => {
-    players[id] = JSON.parse(msg);
-  });
+socket.onmessage = e => {
+  const data = JSON.parse(e.data);
+  if (data.id) myId = data.id;
+  else players = data;
+};
 
-  ws.on("close", () => delete players[id]);
-});
+const me = { x: 0, y: 0, angle: 0, len: 20 };
+const keys = {};
 
-setInterval(() => {
-  const data = JSON.stringify(players);
-  wss.clients.forEach(c => {
-    if (c.readyState === WebSocket.OPEN) c.send(data);
-  });
-}, 50);
+onkeydown = e => keys[e.key] = true;
+onkeyup = e => keys[e.key] = false;
 
-console.log("✅ Multiplayer-Server läuft auf Port 3000");
+function loop() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (keys["w"]) me.y -= 4;
+  if (keys["s"]) me.y += 4;
+  if (keys["a"]) me.x -= 4;
+  if (keys["d"]) me.x += 4;
+
+  if (socket.readyState === 1 && myId) {
+    socket.send(JSON.stringify(me));
+  }
+
+  for (const id in players) {
+    const p = players[id];
+    ctx.fillStyle = id === myId ? "lime" : "cyan";
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width/2 + p.x,
+      canvas.height/2 + p.y,
+      10,
+      0,
+      Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
