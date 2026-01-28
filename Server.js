@@ -1,71 +1,46 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Multiplayer Test</title>
-<style>
-body { margin:0; background:#111; overflow:hidden }
-canvas { display:block }
-</style>
-</head>
-<body>
+// Terminal: npm install ws
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 3000 });
 
-<canvas id="c"></canvas>
+let players = {}; // alle Spieler
 
-<script>
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+wss.on('connection', ws => {
+  const id = Date.now() + Math.random(); // eindeutige Spieler-ID
+  players[id] = { x: 0, y: 0, segments: [{x:0,y:0}], len: 20, name:"Spieler", dead:false };
 
-// 🔴 WICHTIG: IP anpassen (dein PC)
-const socket = new WebSocket("ws://localhost:3000");
+  // ID an neuen Spieler senden
+  ws.send(JSON.stringify({ type: 'init', id }));
 
-let myId = null;
-let players = {};
+  ws.on('message', message => {
+    try {
+      const data = JSON.parse(message);
 
-socket.onmessage = e => {
-  const data = JSON.parse(e.data);
-  if (data.id) myId = data.id;
-  else players = data;
-};
+      if(data.type==='update'){
+        // Update Spielerstatus
+        if(players[id]){
+          players[id].x = data.x;
+          players[id].y = data.y;
+          players[id].len = data.len;
+          players[id].segments = data.segments;
+          players[id].dead = data.dead;
+        }
+      }
+    } catch(e){}
 
-const me = { x: 0, y: 0, angle: 0, len: 20 };
-const keys = {};
+    // Broadcast an alle
+    const snapshot = JSON.stringify({ type:'players', players });
+    wss.clients.forEach(client => {
+      if(client.readyState === WebSocket.OPEN) client.send(snapshot);
+    });
+  });
 
-onkeydown = e => keys[e.key] = true;
-onkeyup = e => keys[e.key] = false;
+  ws.on('close', () => {
+    delete players[id];
+    const snapshot = JSON.stringify({ type:'players', players });
+    wss.clients.forEach(client => {
+      if(client.readyState === WebSocket.OPEN) client.send(snapshot);
+    });
+  });
+});
 
-function loop() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  if (keys["w"]) me.y -= 4;
-  if (keys["s"]) me.y += 4;
-  if (keys["a"]) me.x -= 4;
-  if (keys["d"]) me.x += 4;
-
-  if (socket.readyState === 1 && myId) {
-    socket.send(JSON.stringify(me));
-  }
-
-  for (const id in players) {
-    const p = players[id];
-    ctx.fillStyle = id === myId ? "lime" : "cyan";
-    ctx.beginPath();
-    ctx.arc(
-      canvas.width/2 + p.x,
-      canvas.height/2 + p.y,
-      10,
-      0,
-      Math.PI*2
-    );
-    ctx.fill();
-  }
-
-  requestAnimationFrame(loop);
-}
-loop();
-</script>
-
-</body>
-</html>
+console.log("Server läuft auf ws://localhost:3000");
