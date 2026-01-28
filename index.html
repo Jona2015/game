@@ -29,8 +29,8 @@ const mini = document.getElementById('minimap');
 const mctx = mini.getContext('2d');
 canvas.width = innerWidth; canvas.height = innerHeight; mini.width = mini.height = 180;
 
-const WORLD_SIZE = 50000000; 
-let zoom = 0.1;
+const WORLD_SIZE = 500000; 
+let zoom = 0.5;
 let keys = { w:false, a:false, s:false, d:false };
 
 window.addEventListener('keydown', e => { if(e.code==='KeyW') keys.w=true; if(e.code==='KeyA') keys.a=true; if(e.code==='KeyS') keys.s=true; if(e.code==='KeyD') keys.d=true; if(e.code==='Space') player.boost=true; });
@@ -57,7 +57,7 @@ class Snake{
 const player=new Snake(0,0,'lime');
 let respawnTimer=0;
 const bots=[];
-const MAX_BOTS=20;
+const MAX_BOTS=10;
 for(let i=0;i<MAX_BOTS;i++) bots.push(new Snake(rand(-1000,1000),rand(-1000,1000),'red',true));
 
 let score=0; let leaderboard=[];
