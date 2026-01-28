@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Bots & Minimap</title>
+<title>2D Slither.io – Umgedrehte Kollisionen</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; }
 canvas { display:block; }
@@ -39,16 +39,13 @@ let zoom = 0.3;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 1.2;
 const ZOOM_INTENSITY = 0.0015;
-let camera = { x: 0, y: 0 };
+let camera = { x:0, y:0 };
 
-// Zoom zur Mausposition
-canvas.addEventListener('wheel', e => {
+canvas.addEventListener('wheel', e=>{
   e.preventDefault();
-  const mx = e.clientX;
-  const my = e.clientY;
+  const mx = e.clientX, my = e.clientY;
   const wx = (mx - canvas.width/2)/zoom + camera.x;
   const wy = (my - canvas.height/2)/zoom + camera.y;
-
   const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom*(1 - e.deltaY*ZOOM_INTENSITY)));
   camera.x += (wx - camera.x)*(1 - zoom/newZoom);
   camera.y += (wy - camera.y)*(1 - zoom/newZoom);
@@ -106,9 +103,7 @@ class Snake{
         foods.push({x:t.x,y:t.y});
       }
     }
-    if(target)
-      this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
-
+    if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
     const h=this.segments[0];
     this.segments.unshift({
       x:h.x+Math.cos(this.angle)*sp,
@@ -136,9 +131,9 @@ for(let i=0;i<25;i++)
 // ===== MINIMAP =====
 function drawMiniMap(){
   mctx.clearRect(0,0,mini.width,mini.height);
-  const scale = mini.width / (WORLD_SIZE*2);
+  const scale=mini.width/(WORLD_SIZE*2);
   const dot=(x,y,c)=>{mctx.fillStyle=c;mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3);};
-  dot(player.segments[0].x,player.segments[0].y,'lime');
+  if(!player.dead) dot(player.segments[0].x,player.segments[0].y,'lime');
   bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
 }
 
@@ -147,7 +142,6 @@ function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Kamera sanft folgen
   camera.x += (player.segments[0].x-camera.x)*0.08;
   camera.y += (player.segments[0].y-camera.y)*0.08;
 
@@ -168,7 +162,7 @@ function loop(){
     ctx.beginPath();
     ctx.arc(f.x,f.y,4,0,Math.PI*2);
     ctx.fill();
-    if(dist(player.segments[0],f)<10){
+    if(!player.dead && dist(player.segments[0],f)<10){
       player.len+=2;
       foods.splice(foods.indexOf(f),1);
     }
@@ -178,7 +172,7 @@ function loop(){
   let mx = keys.d-keys.a;
   let my = keys.s-keys.w;
   let target = mx||my ? {x:player.segments[0].x+mx*100, y:player.segments[0].y+my*100} : null;
-  player.update(target);
+  if(!player.dead) player.update(target);
 
   // BOT KI
   bots.forEach(b=>{
@@ -196,17 +190,15 @@ function loop(){
     b.update(t);
   });
 
-  // ===== KOLLISIONEN Spieler ↔ Bots =====
-  for(const b of bots){
-    if(b.dead) continue;
+  // ===== UMGEDREHTE KOLLISIONEN =====
+  bots.forEach(b=>{
+    if(b.dead) return;
 
-    // Spieler-Kopf trifft Bot-Körper → Bot stirbt
-    for(let i=15;i<b.segments.length;i++){
-      if(dist(player.segments[0],b.segments[i])<6){
+    // ⚡ Bot-Kopf trifft Spieler-Körper → Bot stirbt
+    for(let i=15;i<player.segments.length;i++){
+      if(dist(b.segments[0],player.segments[i])<6){
         b.dead=true;
-        // drop food
-        for(const s of b.segments) foods.push({x:s.x,y:s.y});
-        // Respawn Bot
+        b.segments.forEach(s=>foods.push({x:s.x,y:s.y}));
         setTimeout(()=>{
           b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
           b.len=rand(20,120);
@@ -215,14 +207,18 @@ function loop(){
       }
     }
 
-    // Bot-Kopf trifft Spieler-Körper → Spieler stirbt
-    for(let i=15;i<player.segments.length;i++){
-      if(dist(player.segments[0],b.segments[i])<6){
-        player.segments=[{x:0,y:0}];
-        player.len=20;
+    // ⚡ Spieler-Kopf trifft Bot-Körper → Spieler stirbt
+    for(let i=15;i<b.segments.length;i++){
+      if(!player.dead && dist(player.segments[0],b.segments[i])<6){
+        player.dead=true;
+        setTimeout(()=>{
+          player.segments=[{x:0,y:0}];
+          player.len=20;
+          player.dead=false;
+        },1000);
       }
     }
-  }
+  });
 
   player.draw(ctx);
   bots.forEach(b=>!b.dead && b.draw(ctx));
