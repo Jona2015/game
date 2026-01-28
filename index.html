@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Map-Rand tödlich</title>
+<title>2D Slither.io – Rand tödlich für Spieler & Bots</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
 canvas { display:block; }
@@ -213,7 +213,7 @@ function loop(){
   ctx.lineWidth=10;
   ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
 
-  // Wenn Spieler außerhalb sterben
+  // Spieler sterben am Rand
   const head = player.segments[0];
   if(Math.abs(head.x) > WORLD_SIZE || Math.abs(head.y) > WORLD_SIZE){
     player.dead = true;
@@ -223,6 +223,20 @@ function loop(){
       player.dead=false;
     },1000);
   }
+
+  // Bots sterben am Rand
+  bots.forEach(b=>{
+    if(b.dead) return;
+    const h = b.segments[0];
+    if(Math.abs(h.x) > WORLD_SIZE || Math.abs(h.y) > WORLD_SIZE){
+      b.dead = true;
+      setTimeout(()=>{
+        b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}];
+        b.len=rand(20,120);
+        b.dead=false;
+      },1000);
+    }
+  });
 
   // FOOD
   ctx.fillStyle='orange';
@@ -261,11 +275,8 @@ function loop(){
   });
 
   // COLLISIONS
-  // Bots vs Spieler
   bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<player.segments.length;i++){ if(dist(b.segments[0],player.segments[i])<6){ b.dead=true; b.segments.forEach(s=>foods.push({x:s.x,y:s.y})); setTimeout(()=>{ b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=rand(20,120); b.dead=false; },1000); } } });
-  // Spieler vs Bots
   bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<b.segments.length;i++){ if(!player.dead && dist(player.segments[0],b.segments[i])<6){ player.dead=true; setTimeout(()=>{ player.segments=[{x:0,y:0}]; player.len=20; player.dead=false; },1000); } } });
-  // Bots vs Bots
   bots.forEach(b=>{ if(b.dead) return; bots.forEach(o=>{ if(o===b || o.dead) return; for(let i=15;i<o.segments.length;i++){ if(dist(b.segments[0],o.segments[i])<6){ o.dead=true; o.segments.forEach(s=>foods.push({x:s.x,y:s.y})); setTimeout(()=>{ o.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; o.len=rand(20,120); o.dead=false; },1000); } } }); });
 
   player.draw(ctx);
