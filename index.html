@@ -1,109 +1,168 @@
-const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 3000 });
-
-let players = {};
-const WORLD_SIZE = 3000;
-function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
-
-// Bots
-let bots = [];
-for(let i=0;i<5;i++){
-  bots.push({ x:Math.random()*2*WORLD_SIZE-WORLD_SIZE, y:Math.random()*2*WORLD_SIZE-WORLD_SIZE, segments:[{x:0,y:0}], len:20, dead:false });
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Slither.io Multiplayer mit Bots & Rangliste</title>
+<style>
+body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
+canvas { display:block; }
+#minimap {
+  position:fixed; top:10px; right:10px; width:180px; height:180px; 
+  background:#000c; border:2px solid #555;
 }
-
-// Update Bots
-function updateBots(){
-  bots.forEach(b=>{
-    if(b.dead) return;
-    let angle = Math.random()*Math.PI*2;
-    b.segments.unshift({x:b.x+Math.cos(angle)*2.5, y:b.y+Math.sin(angle)*2.5});
-    b.x = b.segments[0].x;
-    b.y = b.segments[0].y;
-    while(b.segments.length>b.len) b.segments.pop();
-    // Rand check
-    if(Math.abs(b.x)>WORLD_SIZE || Math.abs(b.y)>WORLD_SIZE){
-      b.dead=true;
-      setTimeout(()=>{
-        b.x = Math.random()*2*WORLD_SIZE-WORLD_SIZE;
-        b.y = Math.random()*2*WORLD_SIZE-WORLD_SIZE;
-        b.segments=[{x:b.x,y:b.y}];
-        b.len=20;
-        b.dead=false;
-      },1000);
-    }
-  });
+#scoreDisplay { position:fixed; top:10px; left:10px; color:lime; font-size:18px; }
+#leaderboard {
+  position:fixed; top:50px; left:10px; color:white; font-size:16px; background:#222a; padding:5px 10px; border-radius:5px;
 }
+</style>
+</head>
+<body>
 
-// Main loop for bots
-setInterval(()=>{
-  updateBots();
-  // Collision with players
-  for(const pid in players){
-    const p = players[pid];
-    if(p.dead) continue;
-    bots.forEach(b=>{
-      if(b.dead) return;
-      for(let i=5;i<b.segments.length;i++){
-        if(dist(p.segments[0],b.segments[i])<6){
-          p.dead=true;
-          setTimeout(()=>{
-            players[pid] = { x:0,y:0,segments:[{x:0,y:0}], len:20, dead:false };
-          },1000);
-        }
-      }
-    });
+<canvas id="game"></canvas>
+<canvas id="minimap"></canvas>
+<div id="scoreDisplay">Score: 0</div>
+<div id="leaderboard"></div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+
+const mini=document.getElementById('minimap');
+const mctx=mini.getContext('2d');
+mini.width=mini.height=180;
+
+const WORLD_SIZE=3000;
+let zoom=0.3;
+let camera={x:0,y:0};
+let score=0;
+
+const keys={w:0,a:0,s:0,d:0};
+let boost=false;
+window.addEventListener('keydown',e=>{ if(e.code==='KeyW')keys.w=1; if(e.code==='KeyA')keys.a=1; if(e.code==='KeyS')keys.s=1; if(e.code==='KeyD')keys.d=1; if(e.code==='Space')boost=true; });
+window.addEventListener('keyup',e=>{ if(e.code==='KeyW')keys.w=0; if(e.code==='KeyA')keys.a=0; if(e.code==='KeyS')keys.s=0; if(e.code==='KeyD')keys.d=0; if(e.code==='Space')boost=false; });
+let mouse={x:0,y:0};
+canvas.addEventListener('mousemove',e=>{ mouse={x:e.clientX,y:e.clientY}; });
+
+// Zoom
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const mx=e.clientX,my=e.clientY;
+  const wx=(mx-canvas.width/2)/zoom+camera.x;
+  const wy=(my-canvas.height/2)/zoom+camera.y;
+  const newZoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));
+  camera.x+=(wx-camera.x)*(1-zoom/newZoom);
+  camera.y+=(wy-camera.y)*(1-zoom/newZoom);
+  zoom=newZoom;
+},{passive:false});
+
+// Snake-Klasse
+class Snake{
+  constructor(x,y,c='lime'){this.segments=[{x,y}];this.len=20;this.speed=4;this.angle=0;this.boost=false;this.color=c;this.dead=false;}
+  update(target){
+    if(this.dead)return;
+    let sp=this.speed;
+    if(this.boost&&this.len>10){sp*=2.3; this.len-=0.15;}
+    if(target)this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
+    const h=this.segments[0];
+    this.segments.unshift({x:h.x+Math.cos(this.angle)*sp,y:h.y+Math.sin(this.angle)*sp});
+    while(this.segments.length>this.len)this.segments.pop();
   }
-},50);
+  draw(ctx){
+    ctx.fillStyle=this.color;
+    for(const s of this.segments){ctx.beginPath();ctx.arc(s.x,s.y,6,0,Math.PI*2);ctx.fill();}
+  }
+}
 
-wss.on('connection', ws=>{
-  const id = Date.now()+Math.random();
-  players[id]={x:0,y:0,segments:[{x:0,y:0}], len:20, dead:false};
-  ws.send(JSON.stringify({ type:'init', id }));
+// Player
+const player=new Snake(0,0,'lime');
 
-  ws.on('message', msg=>{
-    try{
-      const data = JSON.parse(msg);
-      if(data.type==='update' && !players[id].dead){
-        players[id].x = data.x;
-        players[id].y = data.y;
-        players[id].len = data.len;
-        players[id].segments = data.segments;
-        players[id].dead = data.dead;
-      }
-    }catch(e){}
-    // Collision player vs player
-    for(const pid in players){
-      const p = players[pid];
-      if(p.dead) continue;
-      for(const oid in players){
-        if(pid===oid) continue;
-        const o = players[oid];
-        if(o.dead) continue;
-        for(let i=5;i<o.segments.length;i++){
-          if(dist(p.segments[0], o.segments[i])<6){
-            p.dead=true;
-            setTimeout(()=>{
-              players[pid]={x:0,y:0,segments:[{x:0,y:0}], len:20, dead:false};
-            },1000);
-          }
-        }
-      }
-    }
+// Essen
+let foods=[];
+for(let i=0;i<12000;i++)foods.push({x:(Math.random()*2-1)*WORLD_SIZE,y:(Math.random()*2-1)*WORLD_SIZE});
 
-    // Broadcast
-    const snapshot = JSON.stringify({ type:'players', players, bots });
-    wss.clients.forEach(client=>{
-      if(client.readyState===WebSocket.OPEN) client.send(snapshot);
-    });
-  });
+// WebSocket
+const SERVER_IP="192.168.1.100"; // <-- Server-IP anpassen
+const socket=new WebSocket(`ws://${SERVER_IP}:3000`);
+let playerId=null;
+let otherPlayers={}, bots=[];
 
-  ws.on('close', ()=>{
-    delete players[id];
-    const snapshot = JSON.stringify({ type:'players', players, bots });
-    wss.clients.forEach(client=>{
-      if(client.readyState===WebSocket.OPEN) client.send(snapshot);
-    });
-  });
-});
+// Initialisierung
+socket.onmessage=e=>{
+  const data=JSON.parse(e.data);
+  if(data.type==='init')playerId=data.id;
+  else if(data.type==='players'){otherPlayers=data.players; bots=data.bots;}
+};
 
-console.log("Server läuft auf ws://localhost:3000 mit Bots und Kollisionen");
+// Mini-Map
+function drawMiniMap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  const scale=mini.width/(WORLD_SIZE*2);
+  const dot=(x,y,c)=>mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3);
+  dot(player.segments[0].x,player.segments[0].y,'lime');
+  for(const id in otherPlayers){if(id===playerId)continue; const p=otherPlayers[id];if(!p.dead)dot(p.segments[0].x,p.segments[0].y,'cyan');}
+  bots.forEach(b=>{if(!b.dead)dot(b.segments[0].x,b.segments[0].y,'red');});
+}
+
+// Rangliste
+function updateLeaderboard(){
+  let list=[];
+  for(const id in otherPlayers){
+    const p=otherPlayers[id];
+    if(!p.dead) list.push({name:id,score:Math.floor(p.len)});
+  }
+  list.push({name:"You",score:Math.floor(player.len)});
+  list.sort((a,b)=>b.score-a.score);
+  document.getElementById('leaderboard').innerHTML=list.slice(0,10).map(p=>`${p.name}: ${p.score}`).join('<br>');
+}
+
+// Loop
+function loop(){
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+  camera.x+=(player.segments[0].x-camera.x)*0.08;camera.y+=(player.segments[0].y-camera.y)*0.08;
+  ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-camera.x,-camera.y);
+
+  ctx.strokeStyle='white';ctx.lineWidth=10;ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
+
+  // WASD Steuerung: Richtung berechnen
+  let dx = keys.d-keys.a;
+  let dy = keys.s-keys.w;
+  let target = null;
+  if(dx!==0||dy!==0){
+    const angle=Math.atan2(dy,dx);
+    target={x:player.segments[0].x+Math.cos(angle)*100, y:player.segments[0].y+Math.sin(angle)*100};
+  }
+
+  player.boost=boost;
+  player.update(target);
+
+  // Essen
+  ctx.fillStyle='orange';
+  for(const f of foods){ctx.beginPath();ctx.arc(f.x,f.y,4,0,Math.PI*2);ctx.fill();
+    if(Math.hypot(player.segments[0].x-f.x,player.segments[0].y-f.y)<10){player.len+=2;foods.splice(foods.indexOf(f),1);}}
+
+  // Andere Spieler
+  for(const id in otherPlayers){if(id===playerId)continue; const p=otherPlayers[id];if(p.dead)continue;
+    const s=new Snake(0,0,'cyan');s.segments=p.segments;s.draw(ctx);}
+
+  // Bots
+  bots.forEach(b=>{if(!b.dead){const s=new Snake(0,0,'red');s.segments=b.segments;s.draw(ctx);}});
+
+  player.draw(ctx);
+
+  score=Math.floor(player.len);
+  document.getElementById('scoreDisplay').innerText=`Score: ${score}`;
+  drawMiniMap();
+  updateLeaderboard();
+
+  if(socket.readyState===1&&playerId){
+    socket.send(JSON.stringify({type:'update',x:player.segments[0].x,y:player.segments[0].y,len:player.len,segments:player.segments,dead:player.dead}));
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
