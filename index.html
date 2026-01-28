@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Start-Menü & Score</title>
+<title>2D Slither.io – Map-Rand tödlich</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
 canvas { display:block; }
@@ -212,6 +212,17 @@ function loop(){
   ctx.strokeStyle='white';
   ctx.lineWidth=10;
   ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
+
+  // Wenn Spieler außerhalb sterben
+  const head = player.segments[0];
+  if(Math.abs(head.x) > WORLD_SIZE || Math.abs(head.y) > WORLD_SIZE){
+    player.dead = true;
+    setTimeout(()=>{
+      player.segments=[{x:0,y:0}];
+      player.len=20;
+      player.dead=false;
+    },1000);
+  }
 
   // FOOD
   ctx.fillStyle='orange';
