@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>2D Slither.io – Menü & Map Rand</title>
+<title>2D Slither.io – Start-Menü & Score</title>
 <style>
 body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
 canvas { display:block; }
@@ -26,6 +26,10 @@ canvas { display:block; }
   text-align:center;
 }
 #menu input, #menu select, #menu button { margin:5px; padding:5px; font-size:16px; }
+#menu h2 { margin-bottom:10px; }
+#startBtn { font-weight:bold; animation: pulse 1s infinite alternate; }
+@keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+#scoreDisplay { margin-top:10px; font-size:18px; color:lime; }
 </style>
 </head>
 <body>
@@ -40,7 +44,8 @@ canvas { display:block; }
       <option value="touch">Touch</option>
     </select>
   </label><br>
-  <button id="startBtn">Start</button>
+  <button id="startBtn">START</button>
+  <div id="scoreDisplay">Score: 0</div>
 </div>
 
 <canvas id="game"></canvas>
@@ -61,8 +66,10 @@ let camera = {x:0,y:0};
 let playerName = "Spieler";
 let controlType = "wasd";
 let isGameStarted = false;
+let score = 0;
 
 // START-MENU
+const scoreDisplay = document.getElementById('scoreDisplay');
 document.getElementById('startBtn').onclick = ()=>{
   playerName = document.getElementById('playerName').value || "Spieler";
   controlType = document.getElementById('controlType').value;
@@ -102,6 +109,18 @@ canvas.addEventListener('touchmove', e=>{
     touch.x=t.clientX; touch.y=t.clientY; 
     e.preventDefault();
   }
+},{passive:false});
+
+// ZOOM
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const mx = e.clientX, my = e.clientY;
+  const wx = (mx - canvas.width/2)/zoom + camera.x;
+  const wy = (my - canvas.height/2)/zoom + camera.y;
+  const newZoom = Math.max(0.15, Math.min(1.2, zoom*(1 - e.deltaY*0.0015)));
+  camera.x += (wx - camera.x)*(1 - zoom/newZoom);
+  camera.y += (wy - camera.y)*(1 - zoom/newZoom);
+  zoom = newZoom;
 },{passive:false});
 
 // UTILS
@@ -172,6 +191,9 @@ function drawMiniMap(){
   bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
 }
 
+// UPDATE SCORE
+function updateScore(){ score = Math.floor(player.len); scoreDisplay.innerText = `Score: ${score}`; }
+
 // LOOP
 function loop(){
   if(!isGameStarted){ requestAnimationFrame(loop); return; }
@@ -238,6 +260,7 @@ function loop(){
   player.draw(ctx);
   bots.forEach(b=>!b.dead && b.draw(ctx));
   drawMiniMap();
+  updateScore();
   requestAnimationFrame(loop);
 }
 loop();
