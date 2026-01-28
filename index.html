@@ -2,145 +2,110 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Multiplayer</title>
+<title>Slither.io Multiplayer mit Bots</title>
 <style>
-body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
-canvas { display:block; }
-#scoreDisplay { position:fixed; top:10px; left:10px; color:lime; font-size:18px; }
+body{margin:0;background:#111;overflow:hidden;font-family:Arial,sans-serif;color:white;}
+canvas{display:block;}
+#minimap{position:fixed;top:10px;right:10px;width:180px;height:180px;background:#000c;border:2px solid #555;}
+#scoreDisplay{position:fixed;top:10px;left:10px;color:lime;font-size:18px;}
 </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
+<canvas id="minimap"></canvas>
 <div id="scoreDisplay">Score: 0</div>
+
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+canvas.width=innerWidth;
+canvas.height=innerHeight;
 
-const WORLD_SIZE = 3000;
-let zoom = 0.3;
-let camera = {x:0,y:0};
-let score = 0;
+const mini=document.getElementById('minimap');
+const mctx=mini.getContext('2d');
+mini.width=mini.height=180;
 
-const keys = {};
-onkeydown = e => keys[e.key] = true;
-onkeyup = e => keys[e.key] = false;
+const WORLD_SIZE=3000;
+let zoom=0.3;
+let camera={x:0,y:0};
+let score=0;
 
-// WebSocket
-const SERVER_IP = "192.168.1.100"; // <-- IP vom Server-PC
-const socket = new WebSocket(`ws://${SERVER_IP}:3000`);
+const keys={w:0,a:0,s:0,d:0};
+let boost=false;
+window.addEventListener('keydown',e=>{ if(e.code==='KeyW')keys.w=1;if(e.code==='KeyA')keys.a=1;if(e.code==='KeyS')keys.s=1;if(e.code==='KeyD')keys.d=1;if(e.code==='Space')boost=true;});
+window.addEventListener('keyup',e=>{ if(e.code==='KeyW')keys.w=0;if(e.code==='KeyA')keys.a=0;if(e.code==='KeyS')keys.s=0;if(e.code==='KeyD')keys.d=0;if(e.code==='Space')boost=false;});
+canvas.addEventListener('mousemove',e=>{mouse={x:e.clientX,y:e.clientY};});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const mx=e.clientX,my=e.clientY;
+  const wx=(mx-canvas.width/2)/zoom+camera.x;
+  const wy=(my-canvas.height/2)/zoom+camera.y;
+  const newZoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));
+  camera.x+=(wx-camera.x)*(1-zoom/newZoom);
+  camera.y+=(wy-camera.y)*(1-zoom/newZoom);
+  zoom=newZoom;
+},{passive:false});
 
-let playerId = null;
-let otherPlayers = {};
-
-// Snake Klasse
 class Snake{
-  constructor(x,y,c='lime'){
-    this.segments=[{x,y}];
-    this.len=20;
-    this.speed=4;
-    this.angle=0;
-    this.boost=false;
-    this.color=c;
-    this.dead=false;
-  }
-  update(target){
-    if(this.dead) return;
-    let sp = this.speed;
-    if(this.boost && this.len>10){ sp*=2; this.len-=0.15; }
-    if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
-    const h=this.segments[0];
-    this.segments.unshift({x:h.x+Math.cos(this.angle)*sp, y:h.y+Math.sin(this.angle)*sp});
-    while(this.segments.length>this.len) this.segments.pop();
-  }
-  draw(ctx){
-    ctx.fillStyle=this.color;
-    for(const s of this.segments){
-      ctx.beginPath();
-      ctx.arc(s.x,s.y,6,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
+  constructor(x,y,c='lime'){this.segments=[{x,y}];this.len=20;this.speed=4;this.angle=0;this.boost=false;this.color=c;this.dead=false;}
+  update(target){if(this.dead)return;let sp=this.speed;if(this.boost&&this.len>10){sp*=2.3;this.len-=0.15;}if(target)this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);const h=this.segments[0];this.segments.unshift({x:h.x+Math.cos(this.angle)*sp,y:h.y+Math.sin(this.angle)*sp});while(this.segments.length>this.len)this.segments.pop();}
+  draw(ctx){ctx.fillStyle=this.color;for(const s of this.segments){ctx.beginPath();ctx.arc(s.x,s.y,6,0,Math.PI*2);ctx.fill();}}
 }
 
-const player = new Snake(0,0,'lime');
+const player=new Snake(0,0,'lime');
 let foods=[];
-for(let i=0;i<2000;i++) foods.push({x:(Math.random()*2-1)*WORLD_SIZE, y:(Math.random()*2-1)*WORLD_SIZE});
+for(let i=0;i<12000;i++)foods.push({x:(Math.random()*2-1)*WORLD_SIZE,y:(Math.random()*2-1)*WORLD_SIZE});
 
-// WebSocket Events
-socket.onmessage = e => {
-  const data = JSON.parse(e.data);
-  if(data.type==='init') playerId = data.id;
-  else if(data.type==='players') otherPlayers = data.players;
+const SERVER_IP="192.168.1.100"; // <-- Server-IP
+const socket=new WebSocket(`ws://${SERVER_IP}:3000`);
+let playerId=null;
+let otherPlayers={}, bots=[];
+
+socket.onmessage=e=>{
+  const data=JSON.parse(e.data);
+  if(data.type==='init')playerId=data.id;
+  else if(data.type==='players'){otherPlayers=data.players; bots=data.bots;}
 };
 
-// Input
-let mouse={x:0,y:0};
-canvas.addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+function drawMiniMap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  const scale=mini.width/(WORLD_SIZE*2);
+  const dot=(x,y,c)=>mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3);
+  dot(player.segments[0].x,player.segments[0].y,'lime');
+  for(const id in otherPlayers){if(id===playerId)continue; const p=otherPlayers[id];if(!p.dead)dot(p.segments[0].x,p.segments[0].y,'cyan');}
+  bots.forEach(b=>{if(!b.dead)dot(b.segments[0].x,b.segments[0].y,'red');});
+}
 
-// Game Loop
 function loop(){
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+  camera.x+=(player.segments[0].x-camera.x)*0.08;camera.y+=(player.segments[0].y-camera.y)*0.08;
+  ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-camera.x,-camera.y);
 
-  camera.x += (player.segments[0].x - camera.x)*0.08;
-  camera.y += (player.segments[0].y - camera.y)*0.08;
+  ctx.strokeStyle='white';ctx.lineWidth=10;ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
 
-  ctx.translate(canvas.width/2,canvas.height/2);
-  ctx.scale(zoom,zoom);
-  ctx.translate(-camera.x,-camera.y);
+  let target={x:player.segments[0].x,y:player.segments[0].y};
+  target.x+=keys.d-keys.a?100*(keys.d-keys.a):0;target.y+=keys.s-keys.w?100*(keys.s-keys.w):0;
+  player.boost=boost;player.update(target);
 
-  // Map Rand
-  ctx.strokeStyle='white';
-  ctx.lineWidth=10;
-  ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
-
-  // Player movement
-  let target={x:player.segments[0].x, y:player.segments[0].y};
-  if(keys['w']) target.y -= 100;
-  if(keys['s']) target.y += 100;
-  if(keys['a']) target.x -= 100;
-  if(keys['d']) target.x += 100;
-  player.update(target);
-
-  // Food
   ctx.fillStyle='orange';
-  for(const f of foods){
-    ctx.beginPath();
-    ctx.arc(f.x,f.y,4,0,Math.PI*2);
-    ctx.fill();
-    if(Math.hypot(player.segments[0].x-f.x, player.segments[0].y-f.y)<10){ player.len+=2; foods.splice(foods.indexOf(f),1); }
-  }
+  for(const f of foods){ctx.beginPath();ctx.arc(f.x,f.y,4,0,Math.PI*2);ctx.fill();
+    if(Math.hypot(player.segments[0].x-f.x,player.segments[0].y-f.y)<10){player.len+=2;foods.splice(foods.indexOf(f),1);}}
 
-  // Draw other players
-  for(const id in otherPlayers){
-    if(id===playerId) continue;
-    const p = otherPlayers[id];
-    const s = new Snake(0,0,'cyan');
-    s.segments = p.segments;
-    s.dead = p.dead;
-    s.draw(ctx);
-  }
+  for(const id in otherPlayers){if(id===playerId)continue; const p=otherPlayers[id];if(p.dead)continue;
+    const s=new Snake(0,0,'cyan');s.segments=p.segments;s.draw(ctx);}
+
+  bots.forEach(b=>{if(!b.dead){const s=new Snake(0,0,'red');s.segments=b.segments;s.draw(ctx);}});
 
   player.draw(ctx);
+  score=Math.floor(player.len);
+  document.getElementById('scoreDisplay').innerText=`Score: ${score}`;
 
-  // Score
-  score = Math.floor(player.len);
-  document.getElementById('scoreDisplay').innerText = `Score: ${score}`;
-
-  // Send update to server
-  if(socket.readyState===1 && playerId){
-    socket.send(JSON.stringify({
-      type:'update',
-      x: player.segments[0].x,
-      y: player.segments[0].y,
-      len: player.len,
-      segments: player.segments,
-      dead: player.dead
-    }));
+  if(socket.readyState===1&&playerId){
+    socket.send(JSON.stringify({type:'update',x:player.segments[0].x,y:player.segments[0].y,len:player.len,segments:player.segments,dead:player.dead}));
   }
 
+  drawMiniMap();
   requestAnimationFrame(loop);
 }
 loop();
