@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io – Mega Edition</title>
+<title>Slither.io Ultimate</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
 canvas{display:block;}
@@ -16,7 +16,7 @@ canvas{display:block;}
 <body>
 
 <div id="menu">
-<h1>Slither.io Mega Edition</h1>
+<h1>Slither.io Ultimate</h1>
 <input id="playerName" placeholder="Name" />
 <select id="difficulty">
 <option value="easy">Leicht</option>
@@ -67,8 +67,8 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 class Snake{
   constructor(x,y,color,bot=false,name=null){
     this.segments=[{x,y}];
-    this.len=rand(20,80);
-    this.width=12;
+    this.len=rand(50,120);   // größerer Start
+    this.width=14;            // breiter
     this.speed=4;
     this.angle=0;
     this.boost=false;
@@ -83,14 +83,14 @@ class Snake{
     let sp=this.speed;
     if(this.boost && this.len>10){
       sp*=2.3;
-      this.len-=0.15;
+      this.len-=0.2;
       this.boostTick++;
       if(this.boostTick%3===0){
         const t=this.segments.at(-1);
         foods.push({x:t.x+rand(-5,5),y:t.y+rand(-5,5)});
       }
     }
-    if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
+    if(target)this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
     const h=this.segments[0];
     this.segments.unshift({x:h.x+Math.cos(this.angle)*sp,y:h.y+Math.sin(this.angle)*sp});
     while(this.segments.length>this.len)this.segments.pop();
@@ -110,10 +110,10 @@ let player,bots=[];
 function initGame(){
   player=new Snake(0,0,skinSelect.value,false,playerNameInput.value||"Player");
   foods=[];
-  for(let i=0;i<30000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}); // viel mehr Essen
+  for(let i=0;i<60000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}); // 60k Essen
 
   bots=[];
-  const botCount=difficultySelect.value==="easy"?25:difficultySelect.value==="medium"?40:60; // mehr Bots
+  const botCount=difficultySelect.value==="easy"?30:difficultySelect.value==="medium"?50:70; // mehr Bots
   const colors=["red","orange","cyan","violet","yellow","magenta"];
   for(let i=0;i<botCount;i++)bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
 }
@@ -143,7 +143,7 @@ function loop(){
   // Food
   ctx.fillStyle="orange";
   for(const f of foods){ctx.beginPath();ctx.arc(f.x,f.y,4,0,Math.PI*2);ctx.fill();
-    if(!player.dead && dist(ph,f)<10){player.len+=2;player.width+=0.05;foods.splice(foods.indexOf(f),1);}
+    if(!player.dead && dist(ph,f)<12){player.len+=2;player.width+=0.05;foods.splice(foods.indexOf(f),1);}
   }
 
   // Spieler
@@ -151,33 +151,37 @@ function loop(){
   const target=mx||my?{x:ph.x+mx*100,y:ph.y+my*100}:null;
   if(!player.dead)player.update(target);
 
-  // Bots KI (schlauer)
+  // Bots KI (schlau)
   bots.forEach(b=>{
     if(b.dead)return;
     let targets=[player,...bots.filter(bb=>bb!==b&&!bb.dead)];
     targets.sort((a,b)=>dist(b.segments[0],b.segments[0])-dist(a.segments[0],b.segments[0]));
     let t=targets[0].segments[0];
     const d=dist(b.segments[0],t);
-    // Flucht wenn kleiner, Angriff wenn größer
     if(b.len<targets[0].len && d<500){const a=Math.atan2(b.segments[0].y-t.y,b.segments[0].x-t.x);t={x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};}
     else if(b.len>targets[0].len && d<800){t=targets[0].segments[0];}
     b.boost=true; b.update(t);
   });
 
-  // Kollisionslogik
+  // Kollisionslogik mit Drop
   bots.forEach(b=>{
     if(b.dead)return;
-    // Bot-Kopf trifft Spieler-Körper
-    for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6)b.dead=true;
-    // Bot-Kopf trifft Bot-Körper
-    for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6)b.dead=true;}
-    // Spieler-Kopf trifft Bot-Körper
-    for(let i=15;i<b.segments.length;i++)if(dist(player.segments[0],b.segments[i])<6)player.dead=true;
+    // Bot-Kopf trifft Spieler-Körper -> Bot stirbt
+    for(let i=15;i<player.segments.length;i++)
+      if(dist(b.segments[0],player.segments[i])<6){
+        dropLength(b);
+        b.dead=true;
+      }
+    // Bot-Kopf trifft Bot-Körper -> Bot stirbt
+    for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6){dropLength(b);b.dead=true;}}
+    // Spieler-Kopf trifft Bot-Körper -> Spieler stirbt
+    for(let i=15;i<b.segments.length;i++)
+      if(dist(player.segments[0],b.segments[i])<6){dropLength(player);player.dead=true;}
   });
 
   // Respawn
-  bots.forEach(b=>{if(b.dead)setTimeout(()=>{b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];b.len=rand(20,120);b.width=12;b.dead=false;},800);});
-  if(player.dead)setTimeout(()=>{player.segments=[{x:0,y:0}];player.len=20;player.width=12;player.dead=false;},800);
+  bots.forEach(b=>{if(b.dead)setTimeout(()=>{b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];b.len=rand(50,120);b.width=14;b.dead=false;},800);});
+  if(player.dead)setTimeout(()=>{player.segments=[{x:0,y:0}];player.len=80;player.width=14;player.dead=false;},800);
 
   // Draw
   player.draw(ctx); bots.forEach(b=>!b.dead&&b.draw(ctx));
@@ -196,7 +200,11 @@ function loop(){
   bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
 }
 
-/* =================== START =================== */
+// Länge droppen beim Tod
+function dropLength(snake){
+  for(let i=0;i<Math.floor(snake.len);i+=5)foods.push({x:snake.segments[0].x+rand(-20,20),y:snake.segments[0].y+rand(-20,20)});
+}
+
 startBtn.onclick=()=>{
   menu.style.display="none";
   initGame();
