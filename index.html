@@ -119,8 +119,8 @@ function initGame(){
 }
 
 let keys={w:0,a:0,s:0,d:0};
-onkeydown=e=>{if(e.code==="KeyW")keys.w=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.s=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
-onkeyup=e=>{if(e.code==="KeyW")keys.w=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.s=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
+onkeydown=e=>{if(e.code==="KeyW")keys.s=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.w=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
+onkeyup=e=>{if(e.code==="KeyW")keys.s=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.w=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
 canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));},{passive:false});
 
 function loop(){
