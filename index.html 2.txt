@@ -1,278 +1,57 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>2D Slither.io – Map-Rand tödlich</title>
-<style>
-body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
-canvas { display:block; }
-#minimap {
-  position:fixed;
-  top:10px;
-  right:10px;
-  width:180px;
-  height:180px;
-  background:#000c;
-  border:2px solid #555;
-}
-#menu {
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  background:#222a;
-  padding:20px;
-  border-radius:10px;
-  text-align:center;
-}
-#menu input, #menu select, #menu button { margin:5px; padding:5px; font-size:16px; }
-#menu h2 { margin-bottom:10px; }
-#startBtn { font-weight:bold; animation: pulse 1s infinite alternate; }
-@keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
-#scoreDisplay { margin-top:10px; font-size:18px; color:lime; }
-</style>
-</head>
-<body>
+CTYPE html>
+let started=false,score=0,control='wasd';
+const scoreEl=document.getElementById('scoreDisplay');
 
-<div id="menu">
-  <h2>Slither.io Start</h2>
-  <label>Name: <input type="text" id="playerName" value="Spieler"></label><br>
-  <label>Steuerung: 
-    <select id="controlType">
-      <option value="wasd">W/A/S/D</option>
-      <option value="mouse">Maus folgen</option>
-      <option value="touch">Touch</option>
-    </select>
-  </label><br>
-  <button id="startBtn">START</button>
-  <div id="scoreDisplay">Score: 0</div>
-</div>
-
-<canvas id="game"></canvas>
-<canvas id="minimap"></canvas>
-
-<script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const mini = document.getElementById('minimap');
-const mctx = mini.getContext('2d');
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-mini.width = mini.height = 180;
-
-const WORLD_SIZE = 3000;
-let zoom = 0.3;
-let camera = {x:0,y:0};
-let playerName = "Spieler";
-let controlType = "wasd";
-let isGameStarted = false;
-let score = 0;
-
-// START-MENU
-const scoreDisplay = document.getElementById('scoreDisplay');
-document.getElementById('startBtn').onclick = ()=>{
-  playerName = document.getElementById('playerName').value || "Spieler";
-  controlType = document.getElementById('controlType').value;
-  document.getElementById('menu').style.display = 'none';
-  isGameStarted = true;
-};
-
-// INPUT
-let keys={w:0,a:0,s:0,d:0};
-let mouse={x:0,y:0};
-let touch={x:0,y:0};
-
-window.addEventListener('keydown', e=>{
-  if(controlType!=="wasd") return;
-  if(e.code==='KeyW') keys.w=1;
-  if(e.code==='KeyA') keys.a=1;
-  if(e.code==='KeyS') keys.s=1;
-  if(e.code==='KeyD') keys.d=1;
-  if(e.code==='Space') player.boost=true;
-});
-window.addEventListener('keyup', e=>{
-  if(controlType!=="wasd") return;
-  if(e.code==='KeyW') keys.w=0;
-  if(e.code==='KeyA') keys.a=0;
-  if(e.code==='KeyS') keys.s=0;
-  if(e.code==='KeyD') keys.d=0;
-  if(e.code==='Space') player.boost=false;
-});
-
-canvas.addEventListener('mousemove', e=>{
-  if(controlType==="mouse") { mouse.x=e.clientX; mouse.y=e.clientY; }
-});
-
-canvas.addEventListener('touchmove', e=>{
-  if(controlType==="touch") { 
-    const t = e.touches[0];
-    touch.x=t.clientX; touch.y=t.clientY; 
-    e.preventDefault();
-  }
-},{passive:false});
-
-// ZOOM
-canvas.addEventListener('wheel', e=>{
-  e.preventDefault();
-  const mx = e.clientX, my = e.clientY;
-  const wx = (mx - canvas.width/2)/zoom + camera.x;
-  const wy = (my - canvas.height/2)/zoom + camera.y;
-  const newZoom = Math.max(0.15, Math.min(1.2, zoom*(1 - e.deltaY*0.0015)));
-  camera.x += (wx - camera.x)*(1 - zoom/newZoom);
-  camera.y += (wy - camera.y)*(1 - zoom/newZoom);
-  zoom = newZoom;
-},{passive:false});
-
-// UTILS
 const rand=(a,b)=>Math.random()*(b-a)+a;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-// FOOD
-const foods=[];
-for(let i=0;i<12000;i++)
-  foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
-
-// SNAKE CLASS
 class Snake{
-  constructor(x,y,c,isBot=false){
-    this.segments=[{x,y}];
-    this.len=20;
-    this.speed=4;
-    this.angle=0;
-    this.boost=false;
-    this.color=c;
-    this.isBot=isBot;
-    this.boostTick=0;
-    this.dead=false;
-  }
-  update(target){
-    if(this.dead) return;
-    let sp=this.speed;
-    if(this.boost && this.len>10){
-      sp*=2.3;
-      this.len-=0.15;
-      this.boostTick++;
-      if(this.boostTick%5===0){
-        const t=this.segments[this.segments.length-1];
-        foods.push({x:t.x,y:t.y});
-      }
-    }
-    if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
-    const h=this.segments[0];
-    this.segments.unshift({
-      x:h.x+Math.cos(this.angle)*sp,
-      y:h.y+Math.sin(this.angle)*sp
-    });
-    while(this.segments.length>this.len)
-      this.segments.pop();
-  }
-  draw(ctx){
-    ctx.fillStyle=this.color;
-    for(const s of this.segments){
-      ctx.beginPath();
-      ctx.arc(s.x,s.y,6,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
+constructor(x,y,c,isBot=false){this.segs=[{x,y}];this.len=20;this.sp=4;this.a=0;this.boost=false;this.c=c;this.bot=isBot;this.dead=false}
+head(){return this.segs[0]}
+update(t){if(this.dead)return;let s=this.sp;if(this.boost&&this.len>10){s*=2.3;this.len-=.15}
+if(t)this.a=Math.atan2(t.y-this.head().y,t.x-this.head().x);
+this.segs.unshift({x:this.head().x+Math.cos(this.a)*s,y:this.head().y+Math.sin(this.a)*s});
+while(this.segs.length>this.len)this.segs.pop()}
+draw(){ctx.fillStyle=this.c;for(const s of this.segs){ctx.beginPath();ctx.arc(s.x,s.y,6,0,7);ctx.fill()}}
 }
 
-// PLAYER & BOTS
 const player=new Snake(0,0,'lime');
-const bots=[];
-for(let i=0;i<25;i++)
-  bots.push(new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
+const bots=[...Array(25)].map(()=>new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
 
-// MINIMAP
-function drawMiniMap(){
-  mctx.clearRect(0,0,mini.width,mini.height);
-  const scale=mini.width/(WORLD_SIZE*2);
-  const dot=(x,y,c)=>{mctx.fillStyle=c;mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3);};
-  if(!player.dead) dot(player.segments[0].x,player.segments[0].y,'lime');
-  bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
-}
+const foods=[...Array(12000)].map(()=>({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}));
 
-// UPDATE SCORE
-function updateScore(){ score = Math.floor(player.len); scoreDisplay.innerText = `Score: ${score}`; }
+const keys={w:0,a:0,s:0,d:0};let mouse={x:0,y:0},touch={x:0,y:0};
 
-// LOOP
-function loop(){
-  if(!isGameStarted){ requestAnimationFrame(loop); return; }
+onkeydown=e=>{if(control!=='wasd')return;keys.w=e.code==='KeyW';keys.a=e.code==='KeyA';keys.s=e.code==='KeyS';keys.d=e.code==='KeyD';if(e.code==='Space')player.boost=true}
+onkeyup=e=>{if(control!=='wasd')return;keys.w=keys.a=keys.s=keys.d=0;if(e.code==='Space')player.boost=false}
+canvas.onmousemove=e=>control==='mouse'&&(mouse={x:e.clientX,y:e.clientY});
+canvas.ontouchmove=e=>{if(control==='touch'){touch={x:e.touches[0].clientX,y:e.touches[0].clientY};e.preventDefault()}}
 
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+startBtn.onclick=()=>{control=controlType.value;menu.style.display='none';started=true}
 
-  camera.x += (player.segments[0].x-camera.x)*0.08;
-  camera.y += (player.segments[0].y-camera.y)*0.08;
+function loop(){requestAnimationFrame(loop);if(!started)return;
+ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+camera.x+=(player.head().x-camera.x)*.08;camera.y+=(player.head().y-camera.y)*.08;
+ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-camera.x,-camera.y);
+ctx.strokeStyle='white';ctx.lineWidth=10;ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
-  ctx.translate(canvas.width/2,canvas.height/2);
-  ctx.scale(zoom,zoom);
-  ctx.translate(-camera.x,-camera.y);
+if(Math.abs(player.head().x)>WORLD||Math.abs(player.head().y)>WORLD){player.dead=true;setTimeout(()=>{player.segs=[{x:0,y:0}];player.len=20;player.dead=false},800)}
 
-  // Map Rand
-  ctx.strokeStyle='white';
-  ctx.lineWidth=10;
-  ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
+for(let i=foods.length-1;i>=0;i--){const f=foods[i];ctx.fillStyle='orange';ctx.beginPath();ctx.arc(f.x,f.y,4,0,7);ctx.fill();
+if(!player.dead&&dist(player.head(),f)<10){player.len+=2;foods.splice(i,1)}}
 
-  // Wenn Spieler außerhalb sterben
-  const head = player.segments[0];
-  if(Math.abs(head.x) > WORLD_SIZE || Math.abs(head.y) > WORLD_SIZE){
-    player.dead = true;
-    setTimeout(()=>{
-      player.segments=[{x:0,y:0}];
-      player.len=20;
-      player.dead=false;
-    },1000);
-  }
+let t=null;
+if(control==='wasd'){const mx=keys.d-keys.a,my=keys.s-keys.w;if(mx||my)t={x:player.head().x+mx*100,y:player.head().y+my*100}}
+if(control==='mouse')t={x:camera.x+(mouse.x-canvas.width/2)/zoom,y:camera.y+(mouse.y-canvas.height/2)/zoom}
+if(control==='touch')t={x:camera.x+(touch.x-canvas.width/2)/zoom,y:camera.y+(touch.y-canvas.height/2)/zoom}
+player.update(t);
 
-  // FOOD
-  ctx.fillStyle='orange';
-  for(const f of foods){
-    ctx.beginPath();
-    ctx.arc(f.x,f.y,4,0,Math.PI*2);
-    ctx.fill();
-    if(!player.dead && dist(player.segments[0],f)<10){
-      player.len+=2;
-      foods.splice(foods.indexOf(f),1);
-    }
-  }
+bots.forEach(b=>{if(b.dead)return;let target=foods[Math.random()*foods.length|0];b.update(target)});
 
-  // PLAYER MOVE
-  let target=null;
-  if(controlType==="wasd"){
-    let mx = keys.d-keys.a;
-    let my = keys.s-keys.w;
-    if(mx||my) target={x:player.segments[0].x+mx*100,y:player.segments[0].y+my*100};
-  } else if(controlType==="mouse"){
-    target = {x:camera.x+(mouse.x-canvas.width/2)/zoom,y:camera.y+(mouse.y-canvas.height/2)/zoom};
-  } else if(controlType==="touch"){
-    target = {x:camera.x+(touch.x-canvas.width/2)/zoom,y:camera.y+(touch.y-canvas.height/2)/zoom};
-  }
-  if(!player.dead) player.update(target);
+bots.forEach(b=>{if(b.dead)return;for(let i=15;i<player.segs.length;i++)if(dist(b.head(),player.segs[i])<6){b.dead=true}});
+bots.forEach(b=>{if(b.dead)return;for(const o of bots){if(o===b||o.dead)continue;for(let i=15;i<o.segs.length;i++)if(dist(b.head(),o.segs[i])<6){b.dead=true}}});
 
-  // BOT KI
-  bots.forEach(b=>{
-    if(b.dead) return;
-    let t=null;
-    let closest=null; let minD=Infinity;
-    if(!player.dead && b.len>player.len*0.9){ const d=dist(b.segments[0],player.segments[0]); if(d<minD){ minD=d; closest=player; } }
-    bots.forEach(o=>{ if(o===b || o.dead) return; if(b.len>o.len*0.9){ const d=dist(b.segments[0],o.segments[0]); if(d<minD){ minD=d; closest=o; } } });
-    if(closest){ t=closest.segments[0]; b.boost=true; } else { b.boost=false; t=foods[Math.floor(Math.random()*foods.length)]; }
-    b.update(t);
-  });
-
-  // COLLISIONS
-  // Bots vs Spieler
-  bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<player.segments.length;i++){ if(dist(b.segments[0],player.segments[i])<6){ b.dead=true; b.segments.forEach(s=>foods.push({x:s.x,y:s.y})); setTimeout(()=>{ b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=rand(20,120); b.dead=false; },1000); } } });
-  // Spieler vs Bots
-  bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<b.segments.length;i++){ if(!player.dead && dist(player.segments[0],b.segments[i])<6){ player.dead=true; setTimeout(()=>{ player.segments=[{x:0,y:0}]; player.len=20; player.dead=false; },1000); } } });
-  // Bots vs Bots
-  bots.forEach(b=>{ if(b.dead) return; bots.forEach(o=>{ if(o===b || o.dead) return; for(let i=15;i<o.segments.length;i++){ if(dist(b.segments[0],o.segments[i])<6){ o.dead=true; o.segments.forEach(s=>foods.push({x:s.x,y:s.y})); setTimeout(()=>{ o.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; o.len=rand(20,120); o.dead=false; },1000); } } }); });
-
-  player.draw(ctx);
-  bots.forEach(b=>!b.dead && b.draw(ctx));
-  drawMiniMap();
-  updateScore();
-  requestAnimationFrame(loop);
+player.draw();bots.forEach(b=>!b.dead&&b.draw());scoreEl.textContent='Score: '+Math.floor(player.len)
 }
 loop();
 </script>
