@@ -2,15 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Ultimate</title>
+<title>Slither.io Ultimate mit Command</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
 canvas{display:block;}
 #minimap{position:fixed;top:10px;right:10px;width:160px;height:160px;background:#000c;border:2px solid #555;}
 #leaderboard{position:fixed;left:10px;top:10px;background:#000c;padding:8px;border-radius:8px;font-size:14px;}
+#scoreDisplay{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:20px;color:lime;}
+#commandInput{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);width:300px;padding:5px;font-size:16px;background:#000a;border:1px solid white;color:white;}
 #menu{position:fixed;top:0;left:0;width:100%;height:100%;background:#000f;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;font-family:Arial;}
 #menu input,#menu select,#menu button{margin:5px;padding:5px;font-size:16px;}
-#scoreDisplay{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:20px;color:lime;}
 </style>
 </head>
 <body>
@@ -35,6 +36,8 @@ canvas{display:block;}
 
 <div id="leaderboard"></div>
 <div id="scoreDisplay">Score: 0 | Highscore: 0</div>
+<input id="commandInput" placeholder="Command: /spawn bot 10 /spawn food 100 /kill bots /score 500" />
+
 <canvas id="game"></canvas>
 <canvas id="minimap"></canvas>
 
@@ -50,6 +53,7 @@ const difficultySelect=document.getElementById("difficulty");
 const skinSelect=document.getElementById("skin");
 const leaderboardDiv=document.getElementById("leaderboard");
 const scoreDisplay=document.getElementById("scoreDisplay");
+const commandInput=document.getElementById("commandInput");
 
 canvas.width=innerWidth;
 canvas.height=innerHeight;
@@ -67,8 +71,8 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 class Snake{
   constructor(x,y,color,bot=false,name=null){
     this.segments=[{x,y}];
-    this.len=rand(50,120);   // größerer Start
-    this.width=14;            // breiter
+    this.len=rand(50,120);
+    this.width=14;
     this.speed=4;
     this.angle=0;
     this.boost=false;
@@ -113,15 +117,35 @@ function initGame(){
   for(let i=0;i<60000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}); // 60k Essen
 
   bots=[];
-  const botCount=difficultySelect.value==="easy"?30:difficultySelect.value==="medium"?50:70; // mehr Bots
+  const botCount=difficultySelect.value==="easy"?30:difficultySelect.value==="medium"?50:70; 
   const colors=["red","orange","cyan","violet","yellow","magenta"];
   for(let i=0;i<botCount;i++)bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
 }
 
-let keys={s:0,a:0,w:0,d:0};
-onkeydown=e=>{if(e.code==="KeyW")keys.s=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.w=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
-onkeyup=e=>{if(e.code==="KeyW")keys.s=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.w=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
+let keys={w:0,a:0,s:0,d:0};
+onkeydown=e=>{if(e.code==="KeyW")keys.w=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.s=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
+onkeyup=e=>{if(e.code==="KeyW")keys.w=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.s=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
 canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));},{passive:false});
+
+// Command Line
+commandInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const cmd=commandInput.value.trim();
+    const parts=cmd.split(" ");
+    if(parts[0]==="/spawn" && parts[1]==="bot" && !isNaN(parts[2])){
+      for(let i=0;i<parseInt(parts[2]);i++){
+        const colors=["red","orange","cyan","violet","yellow","magenta"];
+        bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
+      }
+    }
+    else if(parts[0]==="/spawn" && parts[1]==="food" && !isNaN(parts[2])){
+      for(let i=0;i<parseInt(parts[2]);i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
+    }
+    else if(cmd==="/kill bots")bots.forEach(b=>dropLength(b),bots.forEach(b=>b.dead=true));
+    else if(parts[0]==="/score" && !isNaN(parts[1]))player.len=parseInt(parts[1]);
+    commandInput.value="";
+  }
+});
 
 function loop(){
   requestAnimationFrame(loop);
@@ -151,7 +175,7 @@ function loop(){
   const target=mx||my?{x:ph.x+mx*100,y:ph.y+my*100}:null;
   if(!player.dead)player.update(target);
 
-  // Bots KI (schlau)
+  // Bots KI
   bots.forEach(b=>{
     if(b.dead)return;
     let targets=[player,...bots.filter(bb=>bb!==b&&!bb.dead)];
@@ -166,17 +190,9 @@ function loop(){
   // Kollisionslogik mit Drop
   bots.forEach(b=>{
     if(b.dead)return;
-    // Bot-Kopf trifft Spieler-Körper -> Bot stirbt
-    for(let i=15;i<player.segments.length;i++)
-      if(dist(b.segments[0],player.segments[i])<6){
-        dropLength(b);
-        b.dead=true;
-      }
-    // Bot-Kopf trifft Bot-Körper -> Bot stirbt
+    for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6){dropLength(b);b.dead=true;}
     for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6){dropLength(b);b.dead=true;}}
-    // Spieler-Kopf trifft Bot-Körper -> Spieler stirbt
-    for(let i=15;i<b.segments.length;i++)
-      if(dist(player.segments[0],b.segments[i])<6){dropLength(player);player.dead=true;}
+    for(let i=15;i<b.segments.length;i++)if(dist(player.segments[0],b.segments[i])<6){dropLength(player);player.dead=true;}
   });
 
   // Respawn
