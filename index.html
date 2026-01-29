@@ -2,185 +2,275 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io – WASD Steuerung</title>
+<title>Slither.io – WASD + tödlicher Rand</title>
+
 <style>
-body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white}
+body{
+  margin:0;
+  background:#111;
+  overflow:hidden;
+  font-family:Arial;
+  color:white;
+}
 canvas{display:block}
-#minimap{position:fixed;top:10px;right:10px;width:160px;height:160px;background:#000c;border:2px solid #555}
+#minimap{
+  position:fixed;
+  top:10px;
+  right:10px;
+  width:160px;
+  height:160px;
+  background:#000c;
+  border:2px solid #555;
+}
 #leaderboard{
- position:fixed;left:10px;top:10px;
- background:#000c;padding:8px;border-radius:8px;font-size:14px
+  position:fixed;
+  left:10px;
+  top:10px;
+  background:#000c;
+  padding:8px;
+  border-radius:8px;
+  font-size:14px;
 }
 </style>
 </head>
+
 <body>
 
 <div id="leaderboard"></div>
-
 <canvas id="game"></canvas>
 <canvas id="minimap"></canvas>
 
 <script>
-const canvas=game,ctx=canvas.getContext("2d");
-const mini=minimap,mctx=mini.getContext("2d");
-canvas.width=innerWidth;canvas.height=innerHeight;
-mini.width=mini.height=160;
+/* =================== GRUNDSETUP =================== */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const mini = document.getElementById("minimap");
+const mctx = mini.getContext("2d");
 
-const WORLD=3000;
-let zoom=0.3,camera={x:0,y:0};
-let started=true; // direkt gestartet, nur WASD
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+mini.width = mini.height = 160;
 
-// Highscore speichern
-let highscore = JSON.parse(localStorage.getItem("slitherHighscore")) || {name:"",score:0,date:""};
+const WORLD = 3000;
+let zoom = 0.3;
+let camera = {x:0,y:0};
 
-// UTILS
-const rand=(a,b)=>Math.random()*(b-a)+a;
-const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+/* =================== HILFSFUNKTIONEN =================== */
+const rand = (a,b)=>Math.random()*(b-a)+a;
+const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-// FOOD
+/* =================== FOOD =================== */
 const foods=[];
-for(let i=0;i<12000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
+for(let i=0;i<12000;i++)
+  foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
 
-// SNAKE
+/* =================== SNAKE =================== */
 class Snake{
- constructor(x,y,c,bot=false){
-  this.segments=[{x,y}];
-  this.len=rand(20,80);
-  this.angle=0;
-  this.speed=4;
-  this.boost=false;
-  this.dead=false;
-  this.bot=bot;
-  this.color=c;
-  this.name=bot?"Bot":"Spieler";
- }
- update(t){
-  if(this.dead)return;
-  let sp=this.speed;
-  if(this.boost&&this.len>10){ sp*=2.3; this.len-=0.15;
-   if(Math.random()<0.2){ const b=this.segments.at(-1); foods.push({x:b.x,y:b.y}); }
+  constructor(x,y,color,bot=false){
+    this.segments=[{x,y}];
+    this.len=rand(20,80);
+    this.speed=4;
+    this.angle=0;
+    this.boost=false;
+    this.dead=false;
+    this.bot=bot;
+    this.color=color;
+    this.name=bot?"Bot":"Spieler";
   }
-  if(t)this.angle=Math.atan2(t.y-this.segments[0].y,t.x-this.segments[0].x);
-  const h=this.segments[0];
-  this.segments.unshift({x:h.x+Math.cos(this.angle)*sp,y:h.y+Math.sin(this.angle)*sp});
-  while(this.segments.length>this.len)this.segments.pop();
- }
- draw(){
-  ctx.fillStyle=this.color;
-  for(const s of this.segments){
-   ctx.beginPath();ctx.arc(s.x,s.y,6,0,Math.PI*2);ctx.fill();
+
+  update(target){
+    if(this.dead) return;
+
+    let sp=this.speed;
+    if(this.boost && this.len>10){
+      sp*=2.3;
+      this.len-=0.15;
+      if(Math.random()<0.2){
+        const t=this.segments.at(-1);
+        foods.push({x:t.x,y:t.y});
+      }
+    }
+
+    if(target)
+      this.angle=Math.atan2(
+        target.y-this.segments[0].y,
+        target.x-this.segments[0].x
+      );
+
+    const h=this.segments[0];
+    this.segments.unshift({
+      x:h.x+Math.cos(this.angle)*sp,
+      y:h.y+Math.sin(this.angle)*sp
+    });
+
+    while(this.segments.length>this.len)
+      this.segments.pop();
   }
- }
+
+  draw(){
+    ctx.fillStyle=this.color;
+    for(const s of this.segments){
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,6,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
 }
 
-// PLAYER & BOTS
-const player=new Snake(0,0,"lime");
-const bots=[];
-const skins=["red","orange","yellow","cyan","violet","pink"];
-for(let i=0;i<25;i++){ const b=new Snake(rand(-1500,1500),rand(-1500,1500),skins[Math.random()*skins.length|0],true); bots.push(b); }
+/* =================== SPIELER & BOTS =================== */
+const player = new Snake(0,0,"lime");
 
-// INPUT WASD
+const bots=[];
+const colors=["red","orange","cyan","violet","yellow"];
+for(let i=0;i<25;i++){
+  bots.push(new Snake(
+    rand(-1500,1500),
+    rand(-1500,1500),
+    colors[i%colors.length],
+    true
+  ));
+}
+
+/* =================== INPUT (WASD) =================== */
 let keys={w:0,a:0,s:0,d:0};
+
 onkeydown=e=>{
- if(e.code==="KeyW")keys.w=1;
- if(e.code==="KeyA")keys.a=1;
- if(e.code==="KeyS")keys.s=1;
- if(e.code==="KeyD")keys.d=1;
- if(e.code==="Space")player.boost=true;
+  if(e.code==="KeyW")keys.w=1;
+  if(e.code==="KeyA")keys.a=1;
+  if(e.code==="KeyS")keys.s=1;
+  if(e.code==="KeyD")keys.d=1;
+  if(e.code==="Space")player.boost=true;
 };
 onkeyup=e=>{
- if(e.code==="KeyW")keys.w=0;
- if(e.code==="KeyA")keys.a=0;
- if(e.code==="KeyS")keys.s=0;
- if(e.code==="KeyD")keys.d=0;
- if(e.code==="Space")player.boost=false;
+  if(e.code==="KeyW")keys.w=0;
+  if(e.code==="KeyA")keys.a=0;
+  if(e.code==="KeyS")keys.s=0;
+  if(e.code==="KeyD")keys.d=0;
+  if(e.code==="Space")player.boost=false;
 };
 
-// ZOOM
+/* =================== ZOOM =================== */
 canvas.addEventListener("wheel",e=>{
- e.preventDefault();
- const mx=e.clientX,my=e.clientY;
- const wx=(mx-canvas.width/2)/zoom+camera.x;
- const wy=(my-canvas.height/2)/zoom+camera.y;
- const nz=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));
- camera.x+=(wx-camera.x)*(1-zoom/nz);
- camera.y+=(wy-camera.y)*(1-zoom/nz);
- zoom=nz;
+  e.preventDefault();
+  zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));
 },{passive:false});
 
-// LOOP
+/* =================== GAME LOOP =================== */
 function loop(){
- requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
 
- ctx.setTransform(1,0,0,1,0,0);
- ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
- camera.x+=(player.segments[0].x-camera.x)*0.08;
- camera.y+=(player.segments[0].y-camera.y)*0.08;
- ctx.translate(canvas.width/2,canvas.height/2);
- ctx.scale(zoom,zoom);
- ctx.translate(-camera.x,-camera.y);
+  camera.x+=(player.segments[0].x-camera.x)*0.08;
+  camera.y+=(player.segments[0].y-camera.y)*0.08;
 
- // MAP RAND
- ctx.strokeStyle="white";ctx.lineWidth=8;
- ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.scale(zoom,zoom);
+  ctx.translate(-camera.x,-camera.y);
 
- // FOOD
- ctx.fillStyle="orange";
- for(const f of foods){
-  ctx.beginPath();ctx.arc(f.x,f.y,4,0,Math.PI*2);ctx.fill();
-  if(!player.dead&&dist(player.segments[0],f)<10){ player.len+=2; foods.splice(foods.indexOf(f),1);}
- }
+  /* ===== MAP RAND (TÖDLICH) ===== */
+  ctx.strokeStyle="white";
+  ctx.lineWidth=8;
+  ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
- // PLAYER MOVE
- let mx=keys.d-keys.a,my=keys.w-keys.s;
- let target=null;
- if(mx||my)target={x:player.segments[0].x+mx*100,y:player.segments[0].y+my*100};
- if(!player.dead)player.update(target);
+  const h=player.segments[0];
+  if(
+    h.x<-WORLD||h.x>WORLD||
+    h.y<-WORLD||h.y>WORLD
+  ) player.dead=true;
 
- // BOT KI SMART
- bots.forEach(b=>{
-  if(b.dead)return;
-  let target=null,closest=null,d=1e9;
-  [...bots,player].forEach(o=>{if(o===b||o.dead)return;const dd=dist(b.segments[0],o.segments[0]);if(dd<d){d=dd;closest=o;}});
-  if(closest){
-   if(b.len>closest.len*1.1){b.boost=true;target=closest.segments[0];}
-   else{b.boost=true;const a=Math.atan2(b.segments[0].y-closest.segments[0].y,b.segments[0].x-closest.segments[0].x);
-    target={x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};
-   }
-  }else target=foods[Math.random()*foods.length|0];
-  b.update(target);
- });
+  /* ===== FOOD ===== */
+  ctx.fillStyle="orange";
+  for(const f of foods){
+    ctx.beginPath();
+    ctx.arc(f.x,f.y,4,0,Math.PI*2);
+    ctx.fill();
+    if(!player.dead && dist(h,f)<10){
+      player.len+=2;
+      foods.splice(foods.indexOf(f),1);
+    }
+  }
 
- // KOLLISIONEN
- bots.forEach(b=>{
-  if(b.dead)return;
-  for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6)b.dead=true;
-  for(let i=15;i<b.segments.length;i++)if(dist(player.segments[0],b.segments[i])<6)player.dead=true;
-  bots.forEach(o=>{if(o===b||o.dead)return;for(let i=15;i<o.segments.length;i++)if(dist(b.segments[0],o.segments[i])<6){(b.len>o.len?o:b).dead=true;}});
- });
+  /* ===== SPIELER BEWEGUNG ===== */
+  const mx=keys.d-keys.a;
+  const my=keys.w-keys.s;
+  const target = mx||my ? {x:h.x+mx*100,y:h.y+my*100} : null;
+  if(!player.dead) player.update(target);
 
- // RESPAWN
- bots.forEach(b=>{if(b.dead)setTimeout(()=>{b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];b.len=rand(20,120);b.dead=false;},800);});
- if(player.dead)setTimeout(()=>{player.segments=[{x:0,y:0}];player.len=20;player.dead=false;},800);
+  /* ===== BOT KI ===== */
+  bots.forEach(b=>{
+    if(b.dead) return;
+    let t=player.segments[0];
+    if(b.len<player.len){
+      const a=Math.atan2(
+        b.segments[0].y-player.segments[0].y,
+        b.segments[0].x-player.segments[0].x
+      );
+      t={
+        x:b.segments[0].x+Math.cos(a)*200,
+        y:b.segments[0].y+Math.sin(a)*200
+      };
+    }
+    b.boost=true;
+    b.update(t);
+  });
 
- player.draw();bots.forEach(b=>!b.dead&&b.draw());
+  /* ===== KOLLISIONEN (UMGEDREHT) ===== */
+  bots.forEach(b=>{
+    if(b.dead) return;
 
- // LEADERBOARD
- const lb=[player,...bots].filter(s=>!s.dead).sort((a,b)=>b.len-a.len).slice(0,5);
- leaderboard.innerHTML="<b>Leaderboard</b><br>"+lb.map((s,i)=>`${i+1}. ${s.name||"Bot"} (${Math.floor(s.len)})`).join("<br>")+
- "<hr>🏆 Best: "+highscore.name+" ("+highscore.score+")";
+    // Bot-Kopf → Spieler-Körper = Bot tot
+    for(let i=15;i<player.segments.length;i++)
+      if(dist(b.segments[0],player.segments[i])<6)
+        b.dead=true;
 
- // MINIMAP
- mctx.clearRect(0,0,160,160);
- const sc=160/(WORLD*2);
- const dot=(x,y,c)=>{mctx.fillStyle=c;mctx.fillRect(80+x*sc,80+y*sc,3,3);};
- dot(player.segments[0].x,player.segments[0].y,"lime");
- bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
+    // Spieler-Kopf → Bot-Körper = Spieler tot
+    for(let i=15;i<b.segments.length;i++)
+      if(dist(player.segments[0],b.segments[i])<6)
+        player.dead=true;
+  });
 
- // HIGH SCORE UPDATE
- const currentScore = Math.floor(player.len);
- if(currentScore>highscore.score){ highscore={name:player.name,score:currentScore,date:new Date().toLocaleDateString()}; localStorage.setItem("slitherHighscore",JSON.stringify(highscore)); }
+  /* ===== RESPAWN ===== */
+  bots.forEach(b=>{
+    if(b.dead)
+      setTimeout(()=>{
+        b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];
+        b.len=rand(20,120);
+        b.dead=false;
+      },800);
+  });
+
+  if(player.dead)
+    setTimeout(()=>{
+      player.segments=[{x:0,y:0}];
+      player.len=20;
+      player.dead=false;
+    },800);
+
+  /* ===== DRAW ===== */
+  player.draw();
+  bots.forEach(b=>!b.dead&&b.draw());
+
+  /* ===== LEADERBOARD ===== */
+  const lb=[player,...bots]
+    .filter(s=>!s.dead)
+    .sort((a,b)=>b.len-a.len)
+    .slice(0,5);
+
+  leaderboard.innerHTML =
+    "<b>Leaderboard</b><br>"+
+    lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
+
+  /* ===== MINIMAP ===== */
+  mctx.clearRect(0,0,160,160);
+  const sc=160/(WORLD*2);
+  const dot=(x,y,c)=>{
+    mctx.fillStyle=c;
+    mctx.fillRect(80+x*sc,80+y*sc,3,3);
+  };
+  dot(player.segments[0].x,player.segments[0].y,"lime");
+  bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
 }
 loop();
 </script>
