@@ -132,19 +132,19 @@ for(let i=0;i<25;i++){
 }
 
 /* =================== INPUT (WASD) =================== */
-let keys={w:0,a:0,s:0,d:0};
+let keys={s:0,a:0,w:0,d:0};
 
 onkeydown=e=>{
-  if(e.code==="KeyW")keys.w=1;
-  if(e.code==="KeyA")keys.a=1;
   if(e.code==="KeyS")keys.s=1;
+  if(e.code==="KeyA")keys.a=1;
+  if(e.code==="KeyW")keys.w=1;
   if(e.code==="KeyD")keys.d=1;
   if(e.code==="Space")player.boost=true;
 };
 onkeyup=e=>{
-  if(e.code==="KeyW")keys.w=0;
-  if(e.code==="KeyA")keys.a=0;
   if(e.code==="KeyS")keys.s=0;
+  if(e.code==="KeyA")keys.a=0;
+  if(e.code==="KeyW")keys.w=0;
   if(e.code==="KeyD")keys.d=0;
   if(e.code==="Space")player.boost=false;
 };
@@ -194,7 +194,7 @@ function loop(){
 
   /* ===== SPIELER BEWEGUNG ===== */
   const mx=keys.d-keys.a;
-  const my=keys.w-keys.s;
+  const my=keys.s-keys.w;
   const target = mx||my ? {x:h.x+mx*100,y:h.y+my*100} : null;
   if(!player.dead) player.update(target);
 
