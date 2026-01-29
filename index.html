@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Ultimate mit Command</title>
+<title>Slither.io Ultimate Smarte Bots</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
 canvas{display:block;}
@@ -114,20 +114,20 @@ let player,bots=[];
 function initGame(){
   player=new Snake(0,0,skinSelect.value,false,playerNameInput.value||"Player");
   foods=[];
-  for(let i=0;i<60000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}); // 60k Essen
-
+  for(let i=0;i<60000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
   bots=[];
   const botCount=difficultySelect.value==="easy"?30:difficultySelect.value==="medium"?50:70; 
   const colors=["red","orange","cyan","violet","yellow","magenta"];
   for(let i=0;i<botCount;i++)bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
 }
 
+/* =================== INPUT =================== */
 let keys={w:0,a:0,s:0,d:0};
 onkeydown=e=>{if(e.code==="KeyW")keys.w=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.s=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
 onkeyup=e=>{if(e.code==="KeyW")keys.w=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.s=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
 canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));},{passive:false});
 
-// Command Line
+/* =================== COMMAND LINE =================== */
 commandInput.addEventListener("keydown",e=>{
   if(e.key==="Enter"){
     const cmd=commandInput.value.trim();
@@ -141,12 +141,42 @@ commandInput.addEventListener("keydown",e=>{
     else if(parts[0]==="/spawn" && parts[1]==="food" && !isNaN(parts[2])){
       for(let i=0;i<parseInt(parts[2]);i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
     }
-    else if(cmd==="/kill bots")bots.forEach(b=>dropLength(b),bots.forEach(b=>b.dead=true));
+    else if(cmd==="/kill bots"){bots.forEach(b=>dropLength(b));bots.forEach(b=>b.dead=true);}
     else if(parts[0]==="/score" && !isNaN(parts[1]))player.len=parseInt(parts[1]);
     commandInput.value="";
   }
 });
 
+/* =================== SMART BOT LOGIK =================== */
+function smartBotTarget(bot){
+  if(bot.dead)return null;
+  let visible=[player,...bots.filter(b=>b!==bot&&!b.dead)];
+  visible.sort((a,b)=>dist(bot.segments[0],a.segments[0])-dist(bot.segments[0],b.segments[0]));
+  for(let t of visible){
+    const d=dist(bot.segments[0],t.segments[0]);
+    if(t===player){ // Spieler
+      if(bot.len>t.len*1.05)return t.segments[0]; // Verfolgen wenn größer
+      else if(d<500){ // Fliehen
+        const a=Math.atan2(bot.segments[0].y-t.segments[0].y,bot.segments[0].x-t.segments[0].x);
+        return {x:bot.segments[0].x+Math.cos(a)*200,y:bot.segments[0].y+Math.sin(a)*200};
+      }
+    }else{ // andere Bots
+      if(bot.len>t.len*1.05 && d<600)return t.segments[0];
+      else if(bot.len<t.len*0.95 && d<400){
+        const a=Math.atan2(bot.segments[0].y-t.segments[0].y,bot.segments[0].x-t.segments[0].x);
+        return {x:bot.segments[0].x+Math.cos(a)*150,y:bot.segments[0].y+Math.sin(a)*150};
+      }
+    }
+  }
+  return foods[Math.floor(Math.random()*foods.length)];
+}
+
+/* =================== DROPPEN DER LÄNGE =================== */
+function dropLength(snake){
+  for(let i=0;i<Math.floor(snake.len);i+=5)foods.push({x:snake.segments[0].x+rand(-20,20),y:snake.segments[0].y+rand(-20,20)});
+}
+
+/* =================== GAME LOOP =================== */
 function loop(){
   requestAnimationFrame(loop);
   ctx.setTransform(1,0,0,1,0,0);
@@ -176,18 +206,9 @@ function loop(){
   if(!player.dead)player.update(target);
 
   // Bots KI
-  bots.forEach(b=>{
-    if(b.dead)return;
-    let targets=[player,...bots.filter(bb=>bb!==b&&!bb.dead)];
-    targets.sort((a,b)=>dist(b.segments[0],b.segments[0])-dist(a.segments[0],b.segments[0]));
-    let t=targets[0].segments[0];
-    const d=dist(b.segments[0],t);
-    if(b.len<targets[0].len && d<500){const a=Math.atan2(b.segments[0].y-t.y,b.segments[0].x-t.x);t={x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};}
-    else if(b.len>targets[0].len && d<800){t=targets[0].segments[0];}
-    b.boost=true; b.update(t);
-  });
+  bots.forEach(b=>{if(b.dead)return;b.boost=true;b.update(smartBotTarget(b));});
 
-  // Kollisionslogik mit Drop
+  // Kollisionslogik
   bots.forEach(b=>{
     if(b.dead)return;
     for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6){dropLength(b);b.dead=true;}
@@ -212,15 +233,10 @@ function loop(){
   mctx.clearRect(0,0,160,160);
   const sc=160/(WORLD*2);
   const dot=(x,y,c)=>{ mctx.fillStyle=c; mctx.fillRect(80+x*sc,80+y*sc,3,3); };
-  dot(ph.x,ph.y,"lime");
-  bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
+  dot(ph.x,ph.y,"lime"); bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
 }
 
-// Länge droppen beim Tod
-function dropLength(snake){
-  for(let i=0;i<Math.floor(snake.len);i+=5)foods.push({x:snake.segments[0].x+rand(-20,20),y:snake.segments[0].y+rand(-20,20)});
-}
-
+/* =================== START =================== */
 startBtn.onclick=()=>{
   menu.style.display="none";
   initGame();
