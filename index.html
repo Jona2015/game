@@ -2,17 +2,17 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Simplified</title>
+<title>Slither.io Clone</title>
 <style>
-body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white}
-canvas{display:block}
-#minimap{position:fixed;top:10px;right:10px;width:160px;height:160px;background:#000c;border:2px solid #555}
-#menu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#222e;padding:20px;border-radius:12px;text-align:center}
-#menu input,#menu select,#menu button{margin:6px;padding:6px;font-size:16px}
-#leaderboard{position:fixed;left:10px;top:10px;background:#000c;padding:8px;border-radius:8px;font-size:14px}
+body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
+canvas{display:block;}
+#minimap{position:fixed;top:10px;right:10px;width:160px;height:160px;background:#000c;border:2px solid #555;}
+#menu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#222e;padding:20px;border-radius:12px;text-align:center;}
+#menu input,#menu select,#menu button{margin:6px;padding:6px;font-size:16px;}
+#leaderboard{position:fixed;left:10px;top:10px;background:#000c;padding:8px;border-radius:8px;font-size:14px;}
 #highscoreDisplay{margin-top:8px;color:gold;font-size:14px;}
-#joystick{position:fixed;left:40px;bottom:40px;width:120px;height:120px;border-radius:50%;background:#222a;touch-action:none;display:none}
-#stick{width:50px;height:50px;border-radius:50%;background:#aaa;position:absolute;left:35px;top:35px}
+#joystick{position:fixed;left:40px;bottom:40px;width:120px;height:120px;border-radius:50%;background:#222a;touch-action:none;display:none;}
+#stick{width:50px;height:50px;border-radius:50%;background:#aaa;position:absolute;left:35px;top:35px;}
 </style>
 </head>
 <body>
@@ -42,8 +42,9 @@ canvas{display:block}
 <canvas id="minimap"></canvas>
 
 <script>
-const canvas = game, ctx = canvas.getContext("2d");
-const mini = minimap, mctx = mini.getContext("2d");
+/********** Setup **********/
+const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
+const mini = document.getElementById("minimap"), mctx = mini.getContext("2d");
 canvas.width = innerWidth; canvas.height = innerHeight;
 mini.width = mini.height = 160;
 
@@ -56,7 +57,7 @@ const skins = ["red","orange","yellow","cyan","violet","pink"];
 let highscore = JSON.parse(localStorage.getItem("slitherHighscore")) || {name:"",score:0,date:""};
 if(highscore.score>0) document.getElementById("highscoreDisplay").innerHTML=`🏆 Highscore<br>${highscore.name} - ${highscore.score} (${highscore.date})`;
 
-// Snake class
+/********** Snake Class **********/
 class Snake{
  constructor(x,y,c,bot=false){
   this.segments=[{x,y}]; this.len=Math.random()*60+20; this.angle=0; this.speed=4;
@@ -74,36 +75,35 @@ class Snake{
  draw(){ ctx.fillStyle=this.color; for(const s of this.segments){ ctx.beginPath(); ctx.arc(s.x,s.y,6,0,Math.PI*2); ctx.fill(); } }
 }
 
-// Player & Bots
+/********** Player & Bots **********/
 const player = new Snake(0,0,"lime");
 const bots = [];
 for(let i=0;i<25;i++){ const b = new Snake(Math.random()*2*WORLD-WORLD, Math.random()*2*WORLD-WORLD, skins[Math.random()*skins.length|0], true); b.name="Bot"+i; bots.push(b); }
 
-// Menu start
+/********** Menu Start **********/
 start.onclick = ()=>{
  playerName = name.value||"Spieler"; player.name = playerName; player.color = skin.value;
  control = control.value; menu.style.display="none"; if(control==="touch")joystick.style.display="block"; started = true;
 }
 
-// Joystick
+/********** Joystick **********/
 let joy={x:0,y:0,active:false};
 joystick.addEventListener("touchstart",()=>{joy.active=true});
 joystick.addEventListener("touchmove",e=>{
- const r=60; const t=e.touches[0];
- const rect=joystick.getBoundingClientRect();
+ const r=60; const t=e.touches[0]; const rect=joystick.getBoundingClientRect();
  joy.x=(t.clientX-(rect.left+r))/r; joy.y=(t.clientY-(rect.top+r))/r;
  joy.x=Math.max(-1,Math.min(1,joy.x)); joy.y=Math.max(-1,Math.min(1,joy.y));
  stick.style.left=35+joy.x*30+"px"; stick.style.top=35+joy.y*30+"px";
 });
 joystick.addEventListener("touchend",()=>{joy={x:0,y:0,active:false}; stick.style.left="35px"; stick.style.top="35px";});
 
-// Input
+/********** Input **********/
 let keys={w:0,a:0,s:0,d:0}; let mouse={x:0,y:0};
 document.addEventListener("keydown",e=>{if(control==="wasd"){switch(e.code){case"KeyW":keys.w=1;break;case"KeyA":keys.a=1;break;case"KeyS":keys.s=1;break;case"KeyD":keys.d=1;break;case"Space":player.boost=true;break;}}});
 document.addEventListener("keyup",e=>{switch(e.code){case"KeyW":keys.w=0;break;case"KeyA":keys.a=0;break;case"KeyS":keys.s=0;break;case"KeyD":keys.d=0;break;case"Space":player.boost=false;break;}});
 canvas.onmousemove=e=>{mouse.x=e.clientX; mouse.y=e.clientY;};
 
-// Zoom
+/********** Zoom **********/
 canvas.addEventListener("wheel",e=>{
  e.preventDefault();
  const wx=(e.clientX-canvas.width/2)/zoom+camera.x;
@@ -112,7 +112,7 @@ canvas.addEventListener("wheel",e=>{
  camera.x+=(wx-camera.x)*(1-zoom/nz); camera.y+=(wy-camera.y)*(1-zoom/nz); zoom=nz;
 },{passive:false});
 
-// Main loop
+/********** Main Loop **********/
 function loop(){
  requestAnimationFrame(loop); if(!started)return;
 
@@ -120,7 +120,7 @@ function loop(){
  camera.x+=(player.segments[0].x-camera.x)*0.08; camera.y+=(player.segments[0].y-camera.y)*0.08;
  ctx.translate(canvas.width/2,canvas.height/2); ctx.scale(zoom,zoom); ctx.translate(-camera.x,-camera.y);
 
- // Rand kill
+ // Map-Rand kill
  if(player.segments[0].x<-WORLD||player.segments[0].x>WORLD||player.segments[0].y<-WORLD||player.segments[0].y>WORLD) player.dead=true;
  ctx.strokeStyle="white"; ctx.lineWidth=8; ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
