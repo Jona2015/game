@@ -2,22 +2,34 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io – Vollständiger Canvas Code</title>
+<title>Slither.io – Advanced Full Version</title>
 <style>
-body { margin:0; background:#111; overflow:hidden; font-family:Arial; color:white; }
-canvas { display:block; }
-#minimap {
-  position:fixed; top:10px; right:10px;
-  width:160px; height:160px;
-  background:#000c; border:2px solid #555;
-}
-#leaderboard {
-  position:fixed; left:10px; top:10px;
-  background:#000c; padding:8px; border-radius:8px; font-size:14px;
-}
+body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
+canvas{display:block;}
+#minimap{position:fixed;top:10px;right:10px;width:160px;height:160px;background:#000c;border:2px solid #555;}
+#leaderboard{position:fixed;left:10px;top:10px;background:#000c;padding:8px;border-radius:8px;font-size:14px;}
+#menu{position:fixed;top:0;left:0;width:100%;height:100%;background:#000f;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;font-family:Arial;}
+#menu input, #menu select, #menu button{margin:5px;padding:5px;font-size:16px;}
 </style>
 </head>
 <body>
+
+<div id="menu">
+  <h1>Slither.io Advanced</h1>
+  <input id="playerName" placeholder="Name" />
+  <select id="difficulty">
+    <option value="easy">Leicht</option>
+    <option value="medium" selected>Mittel</option>
+    <option value="hard">Schwer</option>
+  </select>
+  <select id="skin">
+    <option value="lime">Grün</option>
+    <option value="cyan">Cyan</option>
+    <option value="yellow">Gelb</option>
+    <option value="magenta">Magenta</option>
+  </select>
+  <button id="startBtn">Start</button>
+</div>
 
 <div id="leaderboard"></div>
 <canvas id="game"></canvas>
@@ -29,35 +41,41 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const mini = document.getElementById("minimap");
 const mctx = mini.getContext("2d");
+const menu = document.getElementById("menu");
+const startBtn = document.getElementById("startBtn");
+const playerNameInput = document.getElementById("playerName");
+const difficultySelect = document.getElementById("difficulty");
+const skinSelect = document.getElementById("skin");
+const leaderboardDiv = document.getElementById("leaderboard");
 
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 mini.width = mini.height = 160;
 
-const WORLD = 3000;
+const WORLD = 10000;
 let zoom = 0.3;
-let camera = {x:0, y:0};
+let camera = {x:0,y:0};
+let foods = [];
+let highscore = parseInt(localStorage.getItem("slitherHighscore")||0);
 
 /* =================== HILFSFUNKTIONEN =================== */
-const rand = (a,b) => Math.random()*(b-a)+a;
-const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
-
-/* =================== FOOD =================== */
-const foods = [];
-for(let i=0;i<12000;i++) foods.push({x:rand(-WORLD,WORLD), y:rand(-WORLD,WORLD)});
+const rand=(a,b)=>Math.random()*(b-a)+a;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 /* =================== SNAKE CLASS =================== */
-class Snake {
-  constructor(x,y,color,bot=false){
-    this.segments = [{x,y}];
+class Snake{
+  constructor(x,y,color,bot=false,name=null){
+    this.segments=[{x,y}];
     this.len = rand(20,80);
+    this.width = 12; // Breite des Körpers
     this.speed = 4;
     this.angle = 0;
     this.boost = false;
     this.dead = false;
     this.bot = bot;
     this.color = color;
-    this.name = bot ? "Bot" : "Spieler";
+    this.name = name || (bot?"Bot":"Spieler");
+    this.boostTick = 0;
   }
 
   update(target){
@@ -67,51 +85,62 @@ class Snake {
     if(this.boost && this.len>10){
       sp *= 2.3;
       this.len -= 0.15;
-      if(Math.random()<0.2){
+      this.boostTick++;
+      if(this.boostTick%3===0){ // Fallen lassen
         const t = this.segments.at(-1);
-        foods.push({x:t.x, y:t.y});
+        foods.push({x:t.x + rand(-5,5), y:t.y + rand(-5,5)});
       }
     }
 
-    if(target){
-      this.angle = Math.atan2(target.y-this.segments[0].y, target.x-this.segments[0].x);
-    }
+    if(target)
+      this.angle = Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
 
     const h = this.segments[0];
-    this.segments.unshift({x:h.x + Math.cos(this.angle)*sp, y:h.y + Math.sin(this.angle)*sp});
-    while(this.segments.length > this.len) this.segments.pop();
+    this.segments.unshift({
+      x:h.x + Math.cos(this.angle)*sp,
+      y:h.y + Math.sin(this.angle)*sp
+    });
+
+    while(this.segments.length>this.len) this.segments.pop();
   }
 
-  draw(){
+  draw(ctx){
     ctx.fillStyle = this.color;
     for(const s of this.segments){
       ctx.beginPath();
-      ctx.arc(s.x,s.y,6,0,Math.PI*2);
+      ctx.arc(s.x,s.y,this.width/2,0,Math.PI*2);
       ctx.fill();
     }
   }
 }
 
 /* =================== SPIELER & BOTS =================== */
-const player = new Snake(0,0,"lime");
-const bots = [];
-const colors = ["red","orange","cyan","violet","yellow"];
-for(let i=0;i<25;i++) bots.push(new Snake(rand(-1500,1500), rand(-1500,1500), colors[i%colors.length], true));
+let player, bots=[], foodsAmount;
+function initGame(){
+  player = new Snake(0,0,skinSelect.value,false,playerNameInput.value||"Player");
+  foods = [];
+  for(let i=0;i<20000;i++) foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
 
-/* =================== INPUT (WASD + Boost) =================== */
-let keys = {w:0,a:0,s:0,d:0};
+  bots = [];
+  const botCount = difficultySelect.value==="easy"?15:difficultySelect.value==="medium"?25:35;
+  const colors=["red","orange","cyan","violet","yellow","magenta"];
+  for(let i=0;i<botCount;i++)
+    bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
+}
 
-onkeydown = e => {
-  if(e.code==="KeyW") keys.s=1;
+/* =================== INPUT =================== */
+let keys={w:0,a:0,s:0,d:0};
+onkeydown=e=>{
+  if(e.code==="KeyW") keys.w=1;
   if(e.code==="KeyA") keys.a=1;
-  if(e.code==="KeyS") keys.w=1;
+  if(e.code==="KeyS") keys.s=1;
   if(e.code==="KeyD") keys.d=1;
   if(e.code==="Space") player.boost=true;
 };
-onkeyup = e => {
-  if(e.code==="KeyW") keys.s=0;
+onkeyup=e=>{
+  if(e.code==="KeyW") keys.w=0;
   if(e.code==="KeyA") keys.a=0;
-  if(e.code==="KeyS") keys.w=0;
+  if(e.code==="KeyS") keys.s=0;
   if(e.code==="KeyD") keys.d=0;
   if(e.code==="Space") player.boost=false;
 };
@@ -119,108 +148,109 @@ onkeyup = e => {
 /* =================== ZOOM =================== */
 canvas.addEventListener("wheel", e=>{
   e.preventDefault();
-  zoom = Math.max(0.15, Math.min(1.2, zoom*(1 - e.deltaY*0.0015)));
-}, {passive:false});
+  zoom = Math.max(0.15,Math.min(1.2,zoom*(1 - e.deltaY*0.0015)));
+},{passive:false});
 
 /* =================== GAME LOOP =================== */
 function loop(){
   requestAnimationFrame(loop);
-
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  camera.x += (player.segments[0].x - camera.x)*0.08;
-  camera.y += (player.segments[0].y - camera.y)*0.08;
+  camera.x += (player.segments[0].x-camera.x)*0.08;
+  camera.y += (player.segments[0].y-camera.y)*0.08;
 
-  ctx.translate(canvas.width/2, canvas.height/2);
-  ctx.scale(zoom, zoom);
-  ctx.translate(-camera.x, -camera.y);
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.scale(zoom,zoom);
+  ctx.translate(-camera.x,-camera.y);
 
-  /* ===== MAP RAND (TÖDLICH FÜR SPIELER & BOTS) ===== */
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 8;
+  /* ===== MAP RAND ===== */
+  ctx.strokeStyle="white"; ctx.lineWidth=8;
   ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
-  // Spieler-Rand
+  // Spieler sterben am Rand
   const ph = player.segments[0];
-  if(ph.x<-WORLD || ph.x>WORLD || ph.y<-WORLD || ph.y>WORLD) player.dead = true;
+  if(ph.x<-WORLD||ph.x>WORLD||ph.y<-WORLD||ph.y>WORLD) player.dead=true;
 
-  // Bots-Rand
+  // Bots sterben am Rand
   bots.forEach(b=>{
     if(b.dead) return;
     const bh = b.segments[0];
-    if(bh.x<-WORLD || bh.x>WORLD || bh.y<-WORLD || bh.y>WORLD) b.dead = true;
+    if(bh.x<-WORLD||bh.x>WORLD||bh.y<-WORLD||bh.y>WORLD) b.dead=true;
   });
 
   /* ===== FOOD ===== */
-  ctx.fillStyle = "orange";
+  ctx.fillStyle="orange";
   for(const f of foods){
     ctx.beginPath();
     ctx.arc(f.x,f.y,4,0,Math.PI*2);
     ctx.fill();
-    if(!player.dead && dist(ph,f)<10){
-      player.len += 2;
-      foods.splice(foods.indexOf(f),1);
-    }
+    if(!player.dead && dist(ph,f)<10){ player.len+=2; player.width+=0.05; foods.splice(foods.indexOf(f),1);}
   }
 
-  /* ===== SPIELER BEWEGUNG ===== */
-  const mx = keys.d - keys.a;
-  const my = keys.w - keys.s;
-  const target = (mx||my) ? {x:ph.x+mx*100, y:ph.y+my*100} : null;
+  /* ===== PLAYER BEWEGUNG ===== */
+  const mx = keys.d-keys.a;
+  const my = keys.w-keys.s;
+  const target = mx||my?{x:ph.x+mx*100,y:ph.y+my*100}:null;
   if(!player.dead) player.update(target);
 
   /* ===== BOT KI ===== */
   bots.forEach(b=>{
     if(b.dead) return;
-    let t = player.segments[0];
-    if(b.len < player.len){
-      const a = Math.atan2(b.segments[0].y-player.segments[0].y, b.segments[0].x-player.segments[0].x);
-      t = {x:b.segments[0].x+Math.cos(a)*200, y:b.segments[0].y+Math.sin(a)*200};
+    // Smarte Bot-Strategie: greift Spieler oder andere Bots
+    let targets = [player,...bots.filter(bb=>bb!==b && !bb.dead)];
+    targets.sort((a,b)=>dist(b.segments[0],b.segments[0])-dist(a.segments[0],b.segments[0]));
+    let t = targets[0].segments[0];
+    if(b.len<targets[0].len) { // fliehen
+      const a = Math.atan2(b.segments[0].y-t.y,b.segments[0].x-t.x);
+      t = {x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};
     }
     b.boost = true;
     b.update(t);
   });
 
-  /* ===== KOLLISIONEN (UMGEDREHT) ===== */
+  /* ===== KOLLISIONEN ===== */
   bots.forEach(b=>{
     if(b.dead) return;
-    for(let i=15;i<player.segments.length;i++) if(dist(b.segments[0],player.segments[i])<6) b.dead = true;
-    for(let i=15;i<b.segments.length;i++) if(dist(player.segments[0],b.segments[i])<6) player.dead = true;
+    // Bot-Kopf → Spieler-Körper / Bot-Kopf → Bot-Körper
+    for(let i=15;i<player.segments.length;i++) if(dist(b.segments[0],player.segments[i])<6) b.dead=true;
+    for(let other of bots){
+      if(other===b || other.dead) continue;
+      for(let i=15;i<other.segments.length;i++) if(dist(b.segments[0],other.segments[i])<6) b.dead=true;
+    }
+    // Spieler-Kopf → Bot-Körper
+    for(let i=15;i<b.segments.length;i++) if(dist(player.segments[0],b.segments[i])<6) player.dead=true;
   });
 
   /* ===== RESPAWN ===== */
-  bots.forEach(b=>{
-    if(b.dead) setTimeout(()=>{
-      b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];
-      b.len=rand(20,120);
-      b.dead=false;
-    },800);
-  });
-
-  if(player.dead) setTimeout(()=>{
-    player.segments=[{x:0,y:0}];
-    player.len=20;
-    player.dead=false;
-  },800);
+  bots.forEach(b=>{if(b.dead) setTimeout(()=>{b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];b.len=rand(20,120);b.width=12;b.dead=false;},800);});
+  if(player.dead) setTimeout(()=>{player.segments=[{x:0,y:0}];player.len=20;player.width=12;player.dead=false;},800);
 
   /* ===== DRAW ================= */
-  player.draw();
-  bots.forEach(b=>!b.dead&&b.draw());
+  player.draw(ctx);
+  bots.forEach(b=>!b.dead&&b.draw(ctx));
 
   /* ===== LEADERBOARD ===== */
-  const lb = [player,...bots].filter(s=>!s.dead).sort((a,b)=>b.len-a.len).slice(0,5);
-  leaderboard.innerHTML = "<b>Leaderboard</b><br>" + lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
+  const lb=[player,...bots].filter(s=>!s.dead).sort((a,b)=>b.len-a.len).slice(0,5);
+  leaderboardDiv.innerHTML="<b>Leaderboard</b><br>"+lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
 
   /* ===== MINIMAP ===== */
   mctx.clearRect(0,0,160,160);
-  const sc = 160/(WORLD*2);
-  const dot = (x,y,c)=>{ mctx.fillStyle=c; mctx.fillRect(80+x*sc, 80+y*sc,3,3); };
+  const sc=160/(WORLD*2);
+  const dot=(x,y,c)=>{ mctx.fillStyle=c; mctx.fillRect(80+x*sc,80+y*sc,3,3); };
   dot(ph.x,ph.y,"lime");
   bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
+
+  // Highscore speichern
+  if(Math.floor(player.len) > highscore){ highscore = Math.floor(player.len); localStorage.setItem("slitherHighscore", highscore); }
 }
 
-loop();
+/* =================== START BUTTON =================== */
+startBtn.onclick = ()=>{
+  initGame();
+  menu.style.display="none";
+  loop();
+};
 </script>
 </body>
 </html>
