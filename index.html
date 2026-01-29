@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Ultimate – Highscore + Randkill</title>
+<title>Slither.io Ultimate – WASD + Randkill</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white}
 canvas{display:block}
@@ -145,23 +145,27 @@ joystick.addEventListener("touchmove",e=>{
 });
 joystick.addEventListener("touchend",()=>{joy={x:0,y:0,active:false};stick.style.left="35px";stick.style.top="35px";});
 
-// INPUT
+// INPUT: WASD + Space
 let keys={w:0,a:0,s:0,d:0},mouse={x:0,y:0};
-onkeydown=e=>{
- if(control!=="wasd")return;
- if(e.code==="KeyW"||e.key==="w")keys.w=1;
- if(e.code==="KeyA"||e.key==="a")keys.a=1;
- if(e.code==="KeyS"||e.key==="s")keys.s=1;
- if(e.code==="KeyD"||e.key==="d")keys.d=1;
- if(e.code==="Space")player.boost=true;
-};
-onkeyup=e=>{
- if(e.code==="KeyW"||e.key==="w")keys.w=0;
- if(e.code==="KeyA"||e.key==="a")keys.a=0;
- if(e.code==="KeyS"||e.key==="s")keys.s=0;
- if(e.code==="KeyD"||e.key==="d")keys.d=0;
- if(e.code==="Space")player.boost=false;
-};
+window.addEventListener("keydown", e=>{
+    if(control!=="wasd") return;
+    switch(e.code){
+        case "KeyW": keys.w=1; break;
+        case "KeyA": keys.a=1; break;
+        case "KeyS": keys.s=1; break;
+        case "KeyD": keys.d=1; break;
+        case "Space": player.boost=true; break;
+    }
+});
+window.addEventListener("keyup", e=>{
+    switch(e.code){
+        case "KeyW": keys.w=0; break;
+        case "KeyA": keys.a=0; break;
+        case "KeyS": keys.s=0; break;
+        case "KeyD": keys.d=0; break;
+        case "Space": player.boost=false; break;
+    }
+});
 canvas.onmousemove=e=>{mouse.x=e.clientX;mouse.y=e.clientY};
 
 // ZOOM
