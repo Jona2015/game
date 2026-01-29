@@ -2,38 +2,21 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io – WASD + tödlicher Rand</title>
-
+<title>Slither.io – Vollständiger Canvas Code</title>
 <style>
-body{
-  margin:0;
-  background:#111;
-  overflow:hidden;
-  font-family:Arial;
-  color:white;
+body { margin:0; background:#111; overflow:hidden; font-family:Arial; color:white; }
+canvas { display:block; }
+#minimap {
+  position:fixed; top:10px; right:10px;
+  width:160px; height:160px;
+  background:#000c; border:2px solid #555;
 }
-canvas{display:block}
-#minimap{
-  position:fixed;
-  top:10px;
-  right:10px;
-  width:160px;
-  height:160px;
-  background:#000c;
-  border:2px solid #555;
-}
-#leaderboard{
-  position:fixed;
-  left:10px;
-  top:10px;
-  background:#000c;
-  padding:8px;
-  border-radius:8px;
-  font-size:14px;
+#leaderboard {
+  position:fixed; left:10px; top:10px;
+  background:#000c; padding:8px; border-radius:8px; font-size:14px;
 }
 </style>
 </head>
-
 <body>
 
 <div id="leaderboard"></div>
@@ -53,62 +36,54 @@ mini.width = mini.height = 160;
 
 const WORLD = 3000;
 let zoom = 0.3;
-let camera = {x:0,y:0};
+let camera = {x:0, y:0};
 
 /* =================== HILFSFUNKTIONEN =================== */
-const rand = (a,b)=>Math.random()*(b-a)+a;
-const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const rand = (a,b) => Math.random()*(b-a)+a;
+const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
 
 /* =================== FOOD =================== */
-const foods=[];
-for(let i=0;i<12000;i++)
-  foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
+const foods = [];
+for(let i=0;i<12000;i++) foods.push({x:rand(-WORLD,WORLD), y:rand(-WORLD,WORLD)});
 
-/* =================== SNAKE =================== */
-class Snake{
+/* =================== SNAKE CLASS =================== */
+class Snake {
   constructor(x,y,color,bot=false){
-    this.segments=[{x,y}];
-    this.len=rand(20,80);
-    this.speed=4;
-    this.angle=0;
-    this.boost=false;
-    this.dead=false;
-    this.bot=bot;
-    this.color=color;
-    this.name=bot?"Bot":"Spieler";
+    this.segments = [{x,y}];
+    this.len = rand(20,80);
+    this.speed = 4;
+    this.angle = 0;
+    this.boost = false;
+    this.dead = false;
+    this.bot = bot;
+    this.color = color;
+    this.name = bot ? "Bot" : "Spieler";
   }
 
   update(target){
     if(this.dead) return;
 
-    let sp=this.speed;
+    let sp = this.speed;
     if(this.boost && this.len>10){
-      sp*=2.3;
-      this.len-=0.15;
+      sp *= 2.3;
+      this.len -= 0.15;
       if(Math.random()<0.2){
-        const t=this.segments.at(-1);
-        foods.push({x:t.x,y:t.y});
+        const t = this.segments.at(-1);
+        foods.push({x:t.x, y:t.y});
       }
     }
 
-    if(target)
-      this.angle=Math.atan2(
-        target.y-this.segments[0].y,
-        target.x-this.segments[0].x
-      );
+    if(target){
+      this.angle = Math.atan2(target.y-this.segments[0].y, target.x-this.segments[0].x);
+    }
 
-    const h=this.segments[0];
-    this.segments.unshift({
-      x:h.x+Math.cos(this.angle)*sp,
-      y:h.y+Math.sin(this.angle)*sp
-    });
-
-    while(this.segments.length>this.len)
-      this.segments.pop();
+    const h = this.segments[0];
+    this.segments.unshift({x:h.x + Math.cos(this.angle)*sp, y:h.y + Math.sin(this.angle)*sp});
+    while(this.segments.length > this.len) this.segments.pop();
   }
 
   draw(){
-    ctx.fillStyle=this.color;
+    ctx.fillStyle = this.color;
     for(const s of this.segments){
       ctx.beginPath();
       ctx.arc(s.x,s.y,6,0,Math.PI*2);
@@ -119,41 +94,33 @@ class Snake{
 
 /* =================== SPIELER & BOTS =================== */
 const player = new Snake(0,0,"lime");
+const bots = [];
+const colors = ["red","orange","cyan","violet","yellow"];
+for(let i=0;i<25;i++) bots.push(new Snake(rand(-1500,1500), rand(-1500,1500), colors[i%colors.length], true));
 
-const bots=[];
-const colors=["red","orange","cyan","violet","yellow"];
-for(let i=0;i<25;i++){
-  bots.push(new Snake(
-    rand(-1500,1500),
-    rand(-1500,1500),
-    colors[i%colors.length],
-    true
-  ));
-}
+/* =================== INPUT (WASD + Boost) =================== */
+let keys = {w:0,a:0,s:0,d:0};
 
-/* =================== INPUT (WASD) =================== */
-let keys={s:0,a:0,w:0,d:0};
-
-onkeydown=e=>{
-  if(e.code==="KeyW")keys.s=1;
-  if(e.code==="KeyA")keys.a=1;
-  if(e.code==="KeyS")keys.w=1;
-  if(e.code==="KeyD")keys.d=1;
-  if(e.code==="Space")player.boost=true;
+onkeydown = e => {
+  if(e.code==="KeyW") keys.w=1;
+  if(e.code==="KeyA") keys.a=1;
+  if(e.code==="KeyS") keys.s=1;
+  if(e.code==="KeyD") keys.d=1;
+  if(e.code==="Space") player.boost=true;
 };
-onkeyup=e=>{
-  if(e.code==="KeyW")keys.s=0;
-  if(e.code==="KeyA")keys.a=0;
-  if(e.code==="KeyS")keys.w=0;
-  if(e.code==="KeyD")keys.d=0;
-  if(e.code==="Space")player.boost=false;
+onkeyup = e => {
+  if(e.code==="KeyW") keys.w=0;
+  if(e.code==="KeyA") keys.a=0;
+  if(e.code==="KeyS") keys.s=0;
+  if(e.code==="KeyD") keys.d=0;
+  if(e.code==="Space") player.boost=false;
 };
 
 /* =================== ZOOM =================== */
-canvas.addEventListener("wheel",e=>{
+canvas.addEventListener("wheel", e=>{
   e.preventDefault();
-  zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));
-},{passive:false});
+  zoom = Math.max(0.15, Math.min(1.2, zoom*(1 - e.deltaY*0.0015)));
+}, {passive:false});
 
 /* =================== GAME LOOP =================== */
 function loop(){
@@ -162,116 +129,97 @@ function loop(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  camera.x+=(player.segments[0].x-camera.x)*0.08;
-  camera.y+=(player.segments[0].y-camera.y)*0.08;
+  camera.x += (player.segments[0].x - camera.x)*0.08;
+  camera.y += (player.segments[0].y - camera.y)*0.08;
 
-  ctx.translate(canvas.width/2,canvas.height/2);
-  ctx.scale(zoom,zoom);
-  ctx.translate(-camera.x,-camera.y);
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-camera.x, -camera.y);
 
-  /* ===== MAP RAND (TÖDLICH) ===== */
-  ctx.strokeStyle="white";
-  ctx.lineWidth=8;
+  /* ===== MAP RAND (TÖDLICH FÜR SPIELER & BOTS) ===== */
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 8;
   ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
-  const h=player.segments[0];
-  if(
-    h.x<-WORLD||h.x>WORLD||
-    h.y<-WORLD||h.y>WORLD
-  ) player.dead=true;
+  // Spieler-Rand
+  const ph = player.segments[0];
+  if(ph.x<-WORLD || ph.x>WORLD || ph.y<-WORLD || ph.y>WORLD) player.dead = true;
+
+  // Bots-Rand
+  bots.forEach(b=>{
+    if(b.dead) return;
+    const bh = b.segments[0];
+    if(bh.x<-WORLD || bh.x>WORLD || bh.y<-WORLD || bh.y>WORLD) b.dead = true;
+  });
 
   /* ===== FOOD ===== */
-  ctx.fillStyle="orange";
+  ctx.fillStyle = "orange";
   for(const f of foods){
     ctx.beginPath();
     ctx.arc(f.x,f.y,4,0,Math.PI*2);
     ctx.fill();
-    if(!player.dead && dist(h,f)<10){
-      player.len+=2;
+    if(!player.dead && dist(ph,f)<10){
+      player.len += 2;
       foods.splice(foods.indexOf(f),1);
     }
   }
 
   /* ===== SPIELER BEWEGUNG ===== */
-  const mx=keys.d-keys.a;
-  const my=keys.s-keys.w;
-  const target = mx||my ? {x:h.x+mx*100,y:h.y+my*100} : null;
+  const mx = keys.d - keys.a;
+  const my = keys.w - keys.s;
+  const target = (mx||my) ? {x:ph.x+mx*100, y:ph.y+my*100} : null;
   if(!player.dead) player.update(target);
 
   /* ===== BOT KI ===== */
   bots.forEach(b=>{
     if(b.dead) return;
-    let t=player.segments[0];
-    if(b.len<player.len){
-      const a=Math.atan2(
-        b.segments[0].y-player.segments[0].y,
-        b.segments[0].x-player.segments[0].x
-      );
-      t={
-        x:b.segments[0].x+Math.cos(a)*200,
-        y:b.segments[0].y+Math.sin(a)*200
-      };
+    let t = player.segments[0];
+    if(b.len < player.len){
+      const a = Math.atan2(b.segments[0].y-player.segments[0].y, b.segments[0].x-player.segments[0].x);
+      t = {x:b.segments[0].x+Math.cos(a)*200, y:b.segments[0].y+Math.sin(a)*200};
     }
-    b.boost=true;
+    b.boost = true;
     b.update(t);
   });
 
   /* ===== KOLLISIONEN (UMGEDREHT) ===== */
   bots.forEach(b=>{
     if(b.dead) return;
-
-    // Bot-Kopf → Spieler-Körper = Bot tot
-    for(let i=15;i<player.segments.length;i++)
-      if(dist(b.segments[0],player.segments[i])<6)
-        b.dead=true;
-
-    // Spieler-Kopf → Bot-Körper = Spieler tot
-    for(let i=15;i<b.segments.length;i++)
-      if(dist(player.segments[0],b.segments[i])<6)
-        player.dead=true;
+    for(let i=15;i<player.segments.length;i++) if(dist(b.segments[0],player.segments[i])<6) b.dead = true;
+    for(let i=15;i<b.segments.length;i++) if(dist(player.segments[0],b.segments[i])<6) player.dead = true;
   });
 
   /* ===== RESPAWN ===== */
   bots.forEach(b=>{
-    if(b.dead)
-      setTimeout(()=>{
-        b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];
-        b.len=rand(20,120);
-        b.dead=false;
-      },800);
+    if(b.dead) setTimeout(()=>{
+      b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];
+      b.len=rand(20,120);
+      b.dead=false;
+    },800);
   });
 
-  if(player.dead)
-    setTimeout(()=>{
-      player.segments=[{x:0,y:0}];
-      player.len=20;
-      player.dead=false;
-    },800);
+  if(player.dead) setTimeout(()=>{
+    player.segments=[{x:0,y:0}];
+    player.len=20;
+    player.dead=false;
+  },800);
 
-  /* ===== DRAW ===== */
+  /* ===== DRAW ================= */
   player.draw();
   bots.forEach(b=>!b.dead&&b.draw());
 
   /* ===== LEADERBOARD ===== */
-  const lb=[player,...bots]
-    .filter(s=>!s.dead)
-    .sort((a,b)=>b.len-a.len)
-    .slice(0,5);
-
-  leaderboard.innerHTML =
-    "<b>Leaderboard</b><br>"+
-    lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
+  const lb = [player,...bots].filter(s=>!s.dead).sort((a,b)=>b.len-a.len).slice(0,5);
+  leaderboard.innerHTML = "<b>Leaderboard</b><br>" + lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
 
   /* ===== MINIMAP ===== */
   mctx.clearRect(0,0,160,160);
-  const sc=160/(WORLD*2);
-  const dot=(x,y,c)=>{
-    mctx.fillStyle=c;
-    mctx.fillRect(80+x*sc,80+y*sc,3,3);
-  };
-  dot(player.segments[0].x,player.segments[0].y,"lime");
+  const sc = 160/(WORLD*2);
+  const dot = (x,y,c)=>{ mctx.fillStyle=c; mctx.fillRect(80+x*sc, 80+y*sc,3,3); };
+  dot(ph.x,ph.y,"lime");
   bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
 }
+
 loop();
 </script>
 </body>
