@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Ultimate – Highscore</title>
+<title>Slither.io Ultimate – Highscore + Randkill</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white}
 canvas{display:block}
@@ -149,17 +149,17 @@ joystick.addEventListener("touchend",()=>{joy={x:0,y:0,active:false};stick.style
 let keys={w:0,a:0,s:0,d:0},mouse={x:0,y:0};
 onkeydown=e=>{
  if(control!=="wasd")return;
- if(e.code==="KeyW")keys.w=1;
- if(e.code==="KeyA")keys.a=1;
- if(e.code==="KeyS")keys.s=1;
- if(e.code==="KeyD")keys.d=1;
+ if(e.code==="KeyW"||e.key==="w")keys.w=1;
+ if(e.code==="KeyA"||e.key==="a")keys.a=1;
+ if(e.code==="KeyS"||e.key==="s")keys.s=1;
+ if(e.code==="KeyD"||e.key==="d")keys.d=1;
  if(e.code==="Space")player.boost=true;
 };
 onkeyup=e=>{
- if(e.code==="KeyW")keys.w=0;
- if(e.code==="KeyA")keys.a=0;
- if(e.code==="KeyS")keys.s=0;
- if(e.code==="KeyD")keys.d=0;
+ if(e.code==="KeyW"||e.key==="w")keys.w=0;
+ if(e.code==="KeyA"||e.key==="a")keys.a=0;
+ if(e.code==="KeyS"||e.key==="s")keys.s=0;
+ if(e.code==="KeyD"||e.key==="d")keys.d=0;
  if(e.code==="Space")player.boost=false;
 };
 canvas.onmousemove=e=>{mouse.x=e.clientX;mouse.y=e.clientY};
@@ -190,7 +190,11 @@ function loop(){
  ctx.scale(zoom,zoom);
  ctx.translate(-camera.x,-camera.y);
 
- // MAP RAND
+ // MAP RAND (Rand-KILL)
+ if(player.segments[0].x<-WORLD||player.segments[0].x>WORLD||player.segments[0].y<-WORLD||player.segments[0].y>WORLD){
+  player.dead=true;
+ }
+
  ctx.strokeStyle="white";ctx.lineWidth=8;
  ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
 
