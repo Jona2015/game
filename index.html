@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Ultimate Smarte Bots</title>
+<title>Slither.io Ultimate Smarte Bots Angriff</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
 canvas{display:block;}
@@ -147,24 +147,24 @@ commandInput.addEventListener("keydown",e=>{
   }
 });
 
-/* =================== SMART BOT LOGIK =================== */
+/* =================== SMART BOT LOGIK MIT ANGRIFF =================== */
 function smartBotTarget(bot){
   if(bot.dead)return null;
   let visible=[player,...bots.filter(b=>b!==bot&&!b.dead)];
   visible.sort((a,b)=>dist(bot.segments[0],a.segments[0])-dist(bot.segments[0],b.segments[0]));
   for(let t of visible){
     const d=dist(bot.segments[0],t.segments[0]);
-    if(t===player){ // Spieler
-      if(bot.len>t.len*1.05)return t.segments[0]; // Verfolgen wenn größer
-      else if(d<500){ // Fliehen
+    if(t===player){ 
+      if(bot.len>t.len*1.05)return t.segments[0]; 
+      else if(d<600){ 
         const a=Math.atan2(bot.segments[0].y-t.segments[0].y,bot.segments[0].x-t.segments[0].x);
-        return {x:bot.segments[0].x+Math.cos(a)*200,y:bot.segments[0].y+Math.sin(a)*200};
+        return {x:bot.segments[0].x+Math.cos(a)*300,y:bot.segments[0].y+Math.sin(a)*300};
       }
-    }else{ // andere Bots
+    }else{
       if(bot.len>t.len*1.05 && d<600)return t.segments[0];
       else if(bot.len<t.len*0.95 && d<400){
         const a=Math.atan2(bot.segments[0].y-t.segments[0].y,bot.segments[0].x-t.segments[0].x);
-        return {x:bot.segments[0].x+Math.cos(a)*150,y:bot.segments[0].y+Math.sin(a)*150};
+        return {x:bot.segments[0].x+Math.cos(a)*200,y:bot.segments[0].y+Math.sin(a)*200};
       }
     }
   }
@@ -208,12 +208,15 @@ function loop(){
   // Bots KI
   bots.forEach(b=>{if(b.dead)return;b.boost=true;b.update(smartBotTarget(b));});
 
-  // Kollisionslogik
+  // Kollisionslogik – Spieler & Bots
   bots.forEach(b=>{
     if(b.dead)return;
+    // Bot Kopf → Spieler Körper = Bot tot
     for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6){dropLength(b);b.dead=true;}
-    for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6){dropLength(b);b.dead=true;}}
+    // Spieler Kopf → Bot Körper = Spieler tot
     for(let i=15;i<b.segments.length;i++)if(dist(player.segments[0],b.segments[i])<6){dropLength(player);player.dead=true;}
+    // Bots untereinander
+    for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6){dropLength(b);b.dead=true;}}
   });
 
   // Respawn
