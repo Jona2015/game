@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Slither.io Full Experience</title>
+<title>Slither.io – Mega Edition</title>
 <style>
 body{margin:0;background:#111;overflow:hidden;font-family:Arial;color:white;}
 canvas{display:block;}
@@ -16,7 +16,7 @@ canvas{display:block;}
 <body>
 
 <div id="menu">
-<h1>Slither.io Advanced</h1>
+<h1>Slither.io Mega Edition</h1>
 <input id="playerName" placeholder="Name" />
 <select id="difficulty">
 <option value="easy">Leicht</option>
@@ -39,7 +39,6 @@ canvas{display:block;}
 <canvas id="minimap"></canvas>
 
 <script>
-/* =================== GRUNDSETUP =================== */
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 const mini=document.getElementById("minimap");
@@ -62,11 +61,9 @@ let camera={x:0,y:0};
 let foods=[];
 let highscore=parseInt(localStorage.getItem("slitherHighscore")||0);
 
-/* =================== HILFSFUNKTIONEN =================== */
 const rand=(a,b)=>Math.random()*(b-a)+a;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-/* =================== SNAKE =================== */
 class Snake{
   constructor(x,y,color,bot=false,name=null){
     this.segments=[{x,y}];
@@ -113,20 +110,19 @@ let player,bots=[];
 function initGame(){
   player=new Snake(0,0,skinSelect.value,false,playerNameInput.value||"Player");
   foods=[];
-  for(let i=0;i<20000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)});
+  for(let i=0;i<30000;i++)foods.push({x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}); // viel mehr Essen
+
   bots=[];
-  const botCount=difficultySelect.value==="easy"?15:difficultySelect.value==="medium"?25:35;
+  const botCount=difficultySelect.value==="easy"?25:difficultySelect.value==="medium"?40:60; // mehr Bots
   const colors=["red","orange","cyan","violet","yellow","magenta"];
   for(let i=0;i<botCount;i++)bots.push(new Snake(rand(-WORLD/2,WORLD/2),rand(-WORLD/2,WORLD/2),colors[i%colors.length],true));
 }
 
-/* =================== INPUT =================== */
 let keys={w:0,a:0,s:0,d:0};
 onkeydown=e=>{if(e.code==="KeyW")keys.w=1;if(e.code==="KeyA")keys.a=1;if(e.code==="KeyS")keys.s=1;if(e.code==="KeyD")keys.d=1;if(e.code==="Space")player.boost=true;}
 onkeyup=e=>{if(e.code==="KeyW")keys.w=0;if(e.code==="KeyA")keys.a=0;if(e.code==="KeyS")keys.s=0;if(e.code==="KeyD")keys.d=0;if(e.code==="Space")player.boost=false;}
 canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(0.15,Math.min(1.2,zoom*(1-e.deltaY*0.0015)));},{passive:false});
 
-/* =================== GAME LOOP =================== */
 function loop(){
   requestAnimationFrame(loop);
   ctx.setTransform(1,0,0,1,0,0);
@@ -137,62 +133,73 @@ function loop(){
   ctx.scale(zoom,zoom);
   ctx.translate(-camera.x,-camera.y);
 
-  /* ===== MAP RAND ===== */
+  // Map Rand
   ctx.strokeStyle="white"; ctx.lineWidth=8;
   ctx.strokeRect(-WORLD,-WORLD,WORLD*2,WORLD*2);
   const ph=player.segments[0];
   if(ph.x<-WORLD||ph.x>WORLD||ph.y<-WORLD||ph.y>WORLD)player.dead=true;
   bots.forEach(b=>{if(b.dead)return;const bh=b.segments[0];if(bh.x<-WORLD||bh.x>WORLD||bh.y<-WORLD||bh.y>WORLD)b.dead=true;});
 
-  /* ===== FOOD ===== */
+  // Food
   ctx.fillStyle="orange";
   for(const f of foods){ctx.beginPath();ctx.arc(f.x,f.y,4,0,Math.PI*2);ctx.fill();
     if(!player.dead && dist(ph,f)<10){player.len+=2;player.width+=0.05;foods.splice(foods.indexOf(f),1);}
   }
 
-  /* ===== PLAYER BEWEGUNG ===== */
+  // Spieler
   const mx=keys.d-keys.a; const my=keys.w-keys.s;
   const target=mx||my?{x:ph.x+mx*100,y:ph.y+my*100}:null;
   if(!player.dead)player.update(target);
 
-  /* ===== BOT KI ===== */
+  // Bots KI (schlauer)
   bots.forEach(b=>{
     if(b.dead)return;
     let targets=[player,...bots.filter(bb=>bb!==b&&!bb.dead)];
     targets.sort((a,b)=>dist(b.segments[0],b.segments[0])-dist(a.segments[0],b.segments[0]));
     let t=targets[0].segments[0];
-    if(b.len<targets[0].len){const a=Math.atan2(b.segments[0].y-t.y,b.segments[0].x-t.x);t={x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};}
+    const d=dist(b.segments[0],t);
+    // Flucht wenn kleiner, Angriff wenn größer
+    if(b.len<targets[0].len && d<500){const a=Math.atan2(b.segments[0].y-t.y,b.segments[0].x-t.x);t={x:b.segments[0].x+Math.cos(a)*200,y:b.segments[0].y+Math.sin(a)*200};}
+    else if(b.len>targets[0].len && d<800){t=targets[0].segments[0];}
     b.boost=true; b.update(t);
   });
 
-  /* ===== KOLLISIONEN ===== */
+  // Kollisionslogik
   bots.forEach(b=>{
     if(b.dead)return;
+    // Bot-Kopf trifft Spieler-Körper
     for(let i=15;i<player.segments.length;i++)if(dist(b.segments[0],player.segments[i])<6)b.dead=true;
+    // Bot-Kopf trifft Bot-Körper
     for(let other of bots){if(other===b||other.dead)continue;for(let i=15;i<other.segments.length;i++)if(dist(b.segments[0],other.segments[i])<6)b.dead=true;}
+    // Spieler-Kopf trifft Bot-Körper
     for(let i=15;i<b.segments.length;i++)if(dist(player.segments[0],b.segments[i])<6)player.dead=true;
   });
 
-  /* ===== RESPAWN ===== */
+  // Respawn
   bots.forEach(b=>{if(b.dead)setTimeout(()=>{b.segments=[{x:rand(-WORLD,WORLD),y:rand(-WORLD,WORLD)}];b.len=rand(20,120);b.width=12;b.dead=false;},800);});
   if(player.dead)setTimeout(()=>{player.segments=[{x:0,y:0}];player.len=20;player.width=12;player.dead=false;},800);
 
-  /* ===== DRAW ===== */
+  // Draw
   player.draw(ctx); bots.forEach(b=>!b.dead&&b.draw(ctx));
 
-  /* ===== LEADERBOARD ===== */
+  // Leaderboard + Score
   const lb=[player,...bots].filter(s=>!s.dead).sort((a,b)=>b.len-a.len).slice(0,5);
   leaderboardDiv.innerHTML="<b>Leaderboard</b><br>"+lb.map((s,i)=>`${i+1}. ${s.name} (${Math.floor(s.len)})`).join("<br>");
   scoreDisplay.innerHTML=`Score: ${Math.floor(player.len)} | Highscore: ${highscore}`;
-
   if(Math.floor(player.len)>highscore){highscore=Math.floor(player.len);localStorage.setItem("slitherHighscore",highscore);}
+
+  // Minimap
+  mctx.clearRect(0,0,160,160);
+  const sc=160/(WORLD*2);
+  const dot=(x,y,c)=>{ mctx.fillStyle=c; mctx.fillRect(80+x*sc,80+y*sc,3,3); };
+  dot(ph.x,ph.y,"lime");
+  bots.forEach(b=>!b.dead&&dot(b.segments[0].x,b.segments[0].y,"red"));
 }
 
-/* =================== START BUTTON =================== */
+/* =================== START =================== */
 startBtn.onclick=()=>{
   menu.style.display="none";
   initGame();
-  // Start-Animation
   let anim=0;
   const animInterval=setInterval(()=>{document.getElementById("startAnim").innerText="Get Ready"+'.'.repeat(anim%4);anim++;if(anim>12)clearInterval(animInterval);},200);
   loop();
