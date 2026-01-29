@@ -35,9 +35,178 @@ canvas { display:block; }
 <canvas id="minimap"></canvas>
 
 <script>
-// --- Der komplette JavaScript-Code aus der letzten Antwort ---
-// (identisch, nichts gekürzt)
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d');
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+mini.width = mini.height = 180;
 
+const WORLD_SIZE = 3000;
+let zoom = 0.3;
+let camera = {x:0,y:0};
+let playerName = "Spieler";
+let controlType = "wasd";
+let isGameStarted = false;
+let score = 0;
+
+// START MENU
+const scoreDisplay = document.getElementById('scoreDisplay');
+document.getElementById('startBtn').onclick = ()=>{
+  playerName = document.getElementById('playerName').value || "Spieler";
+  controlType = document.getElementById('controlType').value;
+  document.getElementById('menu').style.display = 'none';
+  isGameStarted = true;
+};
+
+// INPUT
+let keys={w:0,a:0,s:0,d:0};
+let mouse={x:0,y:0};
+let touch={x:0,y:0};
+window.addEventListener('keydown', e=>{
+  if(controlType!=="wasd") return;
+  if(e.code==='KeyW') keys.w=1;
+  if(e.code==='KeyA') keys.a=1;
+  if(e.code==='KeyS') keys.s=1;
+  if(e.code==='KeyD') keys.d=1;
+  if(e.code==='Space') player.boost=true;
+});
+window.addEventListener('keyup', e=>{
+  if(controlType!=="wasd") return;
+  if(e.code==='KeyW') keys.w=0;
+  if(e.code==='KeyA') keys.a=0;
+  if(e.code==='KeyS') keys.s=0;
+  if(e.code==='KeyD') keys.d=0;
+  if(e.code==='Space') player.boost=false;
+});
+canvas.addEventListener('mousemove', e=>{ if(controlType==="mouse") { mouse.x=e.clientX; mouse.y=e.clientY; }});
+canvas.addEventListener('touchmove', e=>{ if(controlType==="touch"){ const t=e.touches[0]; touch.x=t.clientX; touch.y=t.clientY; e.preventDefault(); }},{passive:false});
+
+// ZOOM
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const mx = e.clientX, my = e.clientY;
+  const wx = (mx - canvas.width/2)/zoom + camera.x;
+  const wy = (my - canvas.height/2)/zoom + camera.y;
+  const newZoom = Math.max(0.15, Math.min(1.2, zoom*(1 - e.deltaY*0.0015)));
+  camera.x += (wx - camera.x)*(1 - zoom/newZoom);
+  camera.y += (wy - camera.y)*(1 - zoom/newZoom);
+  zoom = newZoom;
+},{passive:false});
+
+// UTILS
+const rand=(a,b)=>Math.random()*(b-a)+a;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+// FOOD
+const foods=[];
+for(let i=0;i<12000;i++) foods.push({x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)});
+
+// SNAKE CLASS
+class Snake{
+  constructor(x,y,c,isBot=false){
+    this.segments=[{x,y}];
+    this.len=20;
+    this.speed=4;
+    this.angle=0;
+    this.boost=false;
+    this.color=c;
+    this.isBot=isBot;
+    this.boostTick=0;
+    this.dead=false;
+  }
+  update(target){
+    if(this.dead) return;
+    let sp=this.speed;
+    if(this.boost && this.len>10){
+      sp*=2.3; this.len-=0.15;
+      this.boostTick++;
+      if(this.boostTick%5===0){ const t=this.segments[this.segments.length-1]; foods.push({x:t.x,y:t.y}); }
+    }
+    if(target) this.angle=Math.atan2(target.y-this.segments[0].y,target.x-this.segments[0].x);
+    const h=this.segments[0];
+    this.segments.unshift({ x:h.x+Math.cos(this.angle)*sp, y:h.y+Math.sin(this.angle)*sp });
+    while(this.segments.length>this.len) this.segments.pop();
+  }
+  draw(ctx){ ctx.fillStyle=this.color; for(const s of this.segments){ ctx.beginPath(); ctx.arc(s.x,s.y,6,0,Math.PI*2); ctx.fill(); } }
+}
+
+// PLAYER & BOTS
+const player=new Snake(0,0,'lime');
+const bots=[];
+for(let i=0;i<25;i++) bots.push(new Snake(rand(-1500,1500),rand(-1500,1500),'red',true));
+
+// MINIMAP
+function drawMiniMap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  const scale=mini.width/(WORLD_SIZE*2);
+  const dot=(x,y,c)=>{mctx.fillStyle=c; mctx.fillRect(mini.width/2+x*scale,mini.height/2+y*scale,3,3); };
+  if(!player.dead) dot(player.segments[0].x,player.segments[0].y,'lime');
+  bots.forEach(b=>!b.dead && dot(b.segments[0].x,b.segments[0].y,'red'));
+}
+
+// UPDATE SCORE
+function updateScore(){ score=Math.floor(player.len); scoreDisplay.innerText=`Score: ${score}`; }
+
+// LOOP
+function loop(){
+  if(!isGameStarted){ requestAnimationFrame(loop); return; }
+
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  camera.x += (player.segments[0].x-camera.x)*0.08;
+  camera.y += (player.segments[0].y-camera.y)*0.08;
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.scale(zoom,zoom);
+  ctx.translate(-camera.x,-camera.y);
+
+  // Map Rand
+  ctx.strokeStyle='white'; ctx.lineWidth=10;
+  ctx.strokeRect(-WORLD_SIZE,-WORLD_SIZE,WORLD_SIZE*2,WORLD_SIZE*2);
+
+  // Spieler sterben am Rand
+  const head = player.segments[0];
+  if(Math.abs(head.x)>WORLD_SIZE||Math.abs(head.y)>WORLD_SIZE){
+    player.dead=true; setTimeout(()=>{ player.segments=[{x:0,y:0}]; player.len=20; player.dead=false; },1000);
+  }
+
+  // Bots sterben am Rand
+  bots.forEach(b=>{ if(b.dead) return; const h=b.segments[0]; if(Math.abs(h.x)>WORLD_SIZE||Math.abs(h.y)>WORLD_SIZE){ b.dead=true; setTimeout(()=>{ b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=rand(20,120); b.dead=false; },1000); } });
+
+  // FOOD
+  ctx.fillStyle='orange';
+  for(const f of foods){ ctx.beginPath(); ctx.arc(f.x,f.y,4,0,Math.PI*2); ctx.fill(); if(!player.dead && dist(player.segments[0],f)<10){ player.len+=2; foods.splice(foods.indexOf(f),1); } }
+
+  // PLAYER MOVE
+  let target=null;
+  if(controlType==="wasd"){ let mx=keys.d-keys.a; let my=keys.s-keys.w; if(mx||my) target={x:player.segments[0].x+mx*100,y:player.segments[0].y+my*100}; }
+  else if(controlType==="mouse"){ target={x:camera.x+(mouse.x-canvas.width/2)/zoom,y:camera.y+(mouse.y-canvas.height/2)/zoom}; }
+  else if(controlType==="touch"){ target={x:camera.x+(touch.x-canvas.width/2)/zoom,y:camera.y+(touch.y-canvas.height/2)/zoom}; }
+  if(!player.dead) player.update(target);
+
+  // BOT KI
+  bots.forEach(b=>{
+    if(b.dead) return;
+    let t=null;
+    let closest=null; let minD=Infinity;
+    if(!player.dead && b.len>player.len*0.9){ const d=dist(b.segments[0],player.segments[0]); if(d<minD){ minD=d; closest=player; } }
+    bots.forEach(o=>{ if(o===b || o.dead) return; if(b.len>o.len*0.9){ const d=dist(b.segments[0],o.segments[0]); if(d<minD){ minD=d; closest=o; } } });
+    if(closest){ t=closest.segments[0]; b.boost=true; } else { b.boost=false; t=foods[Math.floor(Math.random()*foods.length)]; }
+    b.update(t);
+  });
+
+  // UMGEDREHTE KOLLISIONEN
+  bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<player.segments.length;i++){ if(dist(b.segments[0],player.segments[i])<6){ b.dead=true; b.segments.forEach(s=>foods.push({x:s.x,y:s.y})); setTimeout(()=>{ b.segments=[{x:rand(-WORLD_SIZE,WORLD_SIZE),y:rand(-WORLD_SIZE,WORLD_SIZE)}]; b.len=rand(20,120); b.dead=false; },1000); } } });
+  bots.forEach(b=>{ if(b.dead) return; for(let i=15;i<b.segments.length;i++){ if(!player.dead && dist(player.segments[0],b.segments[i])<6){ player.dead=true; setTimeout(()=>{ player.segments=[{x:0,y:0}]; player.len=20; player.dead=false; },1000); } } });
+
+  player.draw(ctx);
+  bots.forEach(b=>!b.dead && b.draw(ctx));
+  drawMiniMap();
+  updateScore();
+  requestAnimationFrame(loop);
+}
+loop();
 </script>
 </body>
 </html>
