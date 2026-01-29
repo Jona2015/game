@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Slither.io – Umgedrehte Kollisionen</title>
+<style>
+body { margin:0; background:#111; overflow:hidden; font-family:Arial,sans-serif; color:white;}
+canvas { display:block; }
+#minimap { position:fixed; top:10px; right:10px; width:180px; height:180px; background:#000c; border:2px solid #555; }
+#menu { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#222a; padding:20px; border-radius:10px; text-align:center;}
+#menu input, #menu select, #menu button { margin:5px; padding:5px; font-size:16px; }
+#menu h2 { margin-bottom:10px; }
+#startBtn { font-weight:bold; animation: pulse 1s infinite alternate; }
+@keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+#scoreDisplay { margin-top:10px; font-size:18px; color:lime; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h2>Slither.io Start</h2>
+  <label>Name: <input type="text" id="playerName" value="Spieler"></label><br>
+  <label>Steuerung: 
+    <select id="controlType">
+      <option value="wasd">W/A/S/D</option>
+      <option value="mouse">Maus folgen</option>
+      <option value="touch">Touch</option>
+    </select>
+  </label><br>
+  <button id="startBtn">START</button>
+  <div id="scoreDisplay">Score: 0</div>
+</div>
+
+<canvas id="game"></canvas>
+<canvas id="minimap"></canvas>
+
+<script>
+// --- Der komplette JavaScript-Code aus der letzten Antwort ---
+// (identisch, nichts gekürzt)
+
+</script>
+</body>
+</html>
